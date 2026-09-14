@@ -72,7 +72,7 @@ jobs:
             cp -a "$KERNEL_BASENAME" "${KERNEL_BASENAME}.orig"
             
             # 调试辅助：打印出真实高通 edma 驱动的位置，帮你核对 Python 路径是否写错
-            echo "=== Debug: Looking for qualcomm/qca edma files ==="
+            echo "=== Debug: Looking for qualcomm/ppe edma files ==="
             find "$KERNEL_BASENAME" -type f -name "edma*.c" | grep -iE "qualcomm|ppe" || echo "Warning: No edma files found for qualcomm!"
             
             # 回到根目录，执行 Python 脚本
