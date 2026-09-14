@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import re
 
 def main():
     kernel_dir = os.environ.get('KERNEL_DIR')
@@ -31,9 +32,9 @@ def main():
     for p in find_file('edma.c', subpath_hint='qualcomm/ppe'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
-        content = content.replace('MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:128, min:16, max:512)")', 'MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:64, min:16, max:64)")')
-        content = content.replace('MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:512 for ipq95xx, min:16, max:512)")', 'MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:64, min:16, max:64)")')
-        content = content.replace('.napi_budget_tx = 512,', '.napi_budget_tx = 64,')
+        content = re.sub(r'MODULE_PARM_DESC\(edma_rx_napi_budget,\s*".*?"\)', 'MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:64, min:16, max:64)")', content)
+        content = re.sub(r'MODULE_PARM_DESC\(edma_tx_napi_budget,\s*".*?"\)', 'MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:64, min:16, max:64)")', content)
+        content = re.sub(r'\.napi_budget_tx\s*=\s*\d+,', '.napi_budget_tx = 64,', content)
         with open(p, 'w', encoding='utf-8') as f: f.write(content)
 
     # 2. 修复 edma_cfg_rx.c
@@ -47,8 +48,8 @@ def main():
     for p in find_file('edma_cfg_rx.h', subpath_hint='qualcomm/ppe'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
-        content = content.replace('#define EDMA_RX_NAPI_WORK_DEF\t\t128', '#define EDMA_RX_NAPI_WORK_DEF\t\t64')
-        content = content.replace('#define EDMA_RX_NAPI_WORK_MAX\t\t512', '#define EDMA_RX_NAPI_WORK_MAX\t\t64')
+        content = re.sub(r'#define\s+EDMA_RX_NAPI_WORK_DEF\s+\d+', '#define EDMA_RX_NAPI_WORK_DEF\t\t64', content)
+        content = re.sub(r'#define\s+EDMA_RX_NAPI_WORK_MAX\s+\d+', '#define EDMA_RX_NAPI_WORK_MAX\t\t64', content)
         with open(p, 'w', encoding='utf-8') as f: f.write(content)
 
     # 4. 修复 edma_cfg_tx.c
@@ -62,8 +63,8 @@ def main():
     for p in find_file('edma_cfg_tx.h', subpath_hint='qualcomm/ppe'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
-        content = content.replace('#define EDMA_TX_NAPI_WORK_DEF\t512', '#define EDMA_TX_NAPI_WORK_DEF\t64')
-        content = content.replace('#define EDMA_TX_NAPI_WORK_MAX\t512', '#define EDMA_TX_NAPI_WORK_MAX\t64')
+        content = re.sub(r'#define\s+EDMA_TX_NAPI_WORK_DEF\s+\d+', '#define EDMA_TX_NAPI_WORK_DEF\t64', content)
+        content = re.sub(r'#define\s+EDMA_TX_NAPI_WORK_MAX\s+\d+', '#define EDMA_TX_NAPI_WORK_MAX\t64', content)
         with open(p, 'w', encoding='utf-8') as f: f.write(content)
 
     print('Successfully applied recursive dynamic kernel patches via external script.')
