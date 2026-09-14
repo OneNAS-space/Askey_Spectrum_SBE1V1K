@@ -1,0 +1,17 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] wifi: ath12k: support Wi-Fi radar direct buffer module
+
+---
+ drivers/net/wireless/ath/ath12k/wmi.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/net/wireless/ath/ath12k/wmi.h
++++ b/drivers/net/wireless/ath/ath12k/wmi.h
+@@ -2371,6 +2371,7 @@
+ 	WMI_DIRECT_BUF_SPECTRAL = 0,
+ 	WMI_DIRECT_BUF_CFR = 1,
+        WMI_DIRECT_BUF_CV_UPLOAD = 2,
++       WMI_CONFIG_MODULE_WIFI_RADAR = 3,
+ 
+ 	/* keep it last */
+ 	WMI_DIRECT_BUF_MAX
