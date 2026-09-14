@@ -36,7 +36,7 @@ jobs:
       - name: Apply OpenWrt Tree Patches
         run: |
           cd openwrt-src
-          patch -p1 < ../config-repo/patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
+          patch -p1 < ../config-repo/my_patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
 
       - name: Select Target (qualcommbe / ipq95xx)
         run: |
@@ -80,7 +80,7 @@ jobs:
 
           git add .
           if ! git diff --cached --quiet; then
-            git commit --amend --no-edit
+            git commit -m "Auto-apply patches and config for Askey SBE1V1K"
           fi
 
           git push target Askey_Spectrum_SBE1V1K --force
