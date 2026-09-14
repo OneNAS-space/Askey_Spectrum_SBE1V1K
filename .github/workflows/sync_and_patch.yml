@@ -61,17 +61,22 @@ jobs:
         run: |
           cd openwrt-src
           
-          # 找到解压后的 Linux 内核源码路径
           KERNEL_DIR=$(find build_dir/target-*/linux-* -maxdepth 1 -type d -name "linux-*" | head -n 1)
           echo "Found kernel dir: $KERNEL_DIR"
           
           if [ -d "$KERNEL_DIR" ]; then
-            python3 -c "
-            import os, glob
-
-            kernel_dir = '$KERNEL_DIR'
+            # 将 KERNEL_DIR 导出为环境变量供 Python 读取
+            export KERNEL_DIR
             
-            # 递归查找目标文件函数
+            python3 - << 'EOF'
+            import os
+            import sys
+
+            kernel_dir = os.environ.get('KERNEL_DIR')
+            if not kernel_dir or not os.path.isdir(kernel_dir):
+                print(f"Error: Invalid kernel directory: {kernel_dir}")
+                sys.exit(1)
+
             def find_file(filename):
                 matches = []
                 for root, dirs, files in os.walk(kernel_dir):
@@ -80,17 +85,13 @@ jobs:
                 return matches
 
             # 1. 修复 edma.c
-            edma_files = find_file('edma.c')
-            if edma_files:
-                for p in edma_files:
-                    print(f'Patching {p}...')
-                    with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
-                    content = content.replace('MODULE_PARM_DESC(edma_rx_napi_budget, \"Rx NAPI budget (default:128, min:16, max:512)\")', 'MODULE_PARM_DESC(edma_rx_napi_budget, \"Rx NAPI budget (default:64, min:16, max:64)\")')
-                    content = content.replace('MODULE_PARM_DESC(edma_tx_napi_budget, \"Tx NAPI budget (default:512 for ipq95xx, min:16, max:512)\")', 'MODULE_PARM_DESC(edma_tx_napi_budget, \"Tx NAPI budget (default:64, min:16, max:64)\")')
-                    content = content.replace('.napi_budget_tx = 512,', '.napi_budget_tx = 64,')
-                    with open(p, 'w', encoding='utf-8') as f: f.write(content)
-            else:
-                print('[!] Warning: edma.c not found.')
+            for p in find_file('edma.c'):
+                print(f'Patching {p}...')
+                with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
+                content = content.replace('MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:128, min:16, max:512)")', 'MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:64, min:16, max:64)")')
+                content = content.replace('MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:512 for ipq95xx, min:16, max:512)")', 'MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:64, min:16, max:64)")')
+                content = content.replace('.napi_budget_tx = 512,', '.napi_budget_tx = 64,')
+                with open(p, 'w', encoding='utf-8') as f: f.write(content)
 
             # 2. 修复 edma_cfg_rx.c
             for p in find_file('edma_cfg_rx.c'):
@@ -123,7 +124,7 @@ jobs:
                 with open(p, 'w', encoding='utf-8') as f: f.write(content)
 
             print('Successfully applied recursive dynamic kernel patches.')
-            "
+            EOF
           else
             echo "Error: Kernel build directory not found."
             exit 1
