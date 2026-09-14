@@ -77,12 +77,18 @@ jobs:
           cd openwrt-src
           rm -rf patches scripts
 
+          # 【核心修改】抹掉上游官方的 .git 历史，重新初始化为一个全新的干净仓库
+          # 这样可以彻底避免浅克隆导致的 index-pack 冲突和推送失败
+          rm -rf .git
+          git init
+          git branch -M Askey_Spectrum_SBE1V1K
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git remote add target "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-          git checkout -b Askey_Spectrum_SBE1V1K
 
           git add .
-          if ! git diff --cached --quiet; then
-            git commit -m "Auto-apply patches and config for Askey SBE1V1K"
-          fi
+          git commit -m "Auto-apply patches and config for Askey SBE1V1K"
 
           git push target Askey_Spectrum_SBE1V1K --force
