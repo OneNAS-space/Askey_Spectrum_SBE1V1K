@@ -17,55 +17,73 @@ def main():
 
     print(f"Targeting kernel directory: {kernel_dir}")
 
-    def find_file(filename, subpath_hint=None):
+    def find_file(filename):
         matches = []
-        for root, dirs, files in os.walk(kernel_dir):
+        for root, dirs, files in os.walk(kernel_dir, followlinks=True):
             if filename in files:
                 full_path = os.path.join(root, filename)
-                # 增加路径提示过滤，避免误伤其他驱动（如 ti/edma.c）
-                if subpath_hint and subpath_hint not in full_path:
-                    continue
-                matches.append(full_path)
+                # 只要路径里包含 ethernet 和 qualcomm，百分之百就是我们要找的高通网卡 edma.c
+                if 'ethernet' in full_path and 'qualcomm' in full_path and 'ppe' in full_path:
+                    matches.append(full_path)
         return matches
 
-    # 1. 修复 edma.c (严格限定在 qualcomm/ppe 路径下)
-    for p in find_file('edma.c', subpath_hint='qualcomm/ppe'):
+    # 1. 修复 edma.c
+    for p in find_file('edma.c'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
-        content = re.sub(r'MODULE_PARM_DESC\(edma_rx_napi_budget,\s*".*?"\)', 'MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:64, min:16, max:64)")', content)
-        content = re.sub(r'MODULE_PARM_DESC\(edma_tx_napi_budget,\s*".*?"\)', 'MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:64, min:16, max:64)")', content)
-        content = re.sub(r'\.napi_budget_tx\s*=\s*\d+,', '.napi_budget_tx = 64,', content)
-        with open(p, 'w', encoding='utf-8') as f: f.write(content)
+        original = content
+        
+        content = re.sub(r'MODULE_PARM_DESC\(\s*edma_rx_napi_budget\s*,\s*".*?"\s*\)', 
+                         'MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:64, min:16, max:64)")', content)
+        content = re.sub(r'MODULE_PARM_DESC\(\s*edma_tx_napi_budget\s*,\s*".*?"\s*\)', 
+                         'MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:64, min:16, max:64)")', content)
+        content = re.sub(r'\.napi_budget_tx\s*=\s*\d+\s*,', '.napi_budget_tx = 64,', content)
+        
+        if content != original:
+            with open(p, 'w', encoding='utf-8') as f: f.write(content)
+            patched_files_count += 1
 
     # 2. 修复 edma_cfg_rx.c
-    for p in find_file('edma_cfg_rx.c', subpath_hint='qualcomm/ppe'):
+    for p in find_file('edma_cfg_rx.c'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
+        original = content
         content = content.replace('hw_info->napi_budget_rx', 'edma_rx_napi_budget')
-        with open(p, 'w', encoding='utf-8') as f: f.write(content)
+        if content != original:
+            with open(p, 'w', encoding='utf-8') as f: f.write(content)
+            patched_files_count += 1
 
     # 3. 修复 edma_cfg_rx.h
-    for p in find_file('edma_cfg_rx.h', subpath_hint='qualcomm/ppe'):
+    for p in find_file('edma_cfg_rx.h'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
+        original = content
         content = re.sub(r'#define\s+EDMA_RX_NAPI_WORK_DEF\s+\d+', '#define EDMA_RX_NAPI_WORK_DEF\t\t64', content)
         content = re.sub(r'#define\s+EDMA_RX_NAPI_WORK_MAX\s+\d+', '#define EDMA_RX_NAPI_WORK_MAX\t\t64', content)
-        with open(p, 'w', encoding='utf-8') as f: f.write(content)
+        if content != original:
+            with open(p, 'w', encoding='utf-8') as f: f.write(content)
+            patched_files_count += 1
 
     # 4. 修复 edma_cfg_tx.c
-    for p in find_file('edma_cfg_tx.c', subpath_hint='qualcomm/ppe'):
+    for p in find_file('edma_cfg_tx.c'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
+        original = content
         content = content.replace('hw_info->napi_budget_tx', 'edma_tx_napi_budget')
-        with open(p, 'w', encoding='utf-8') as f: f.write(content)
+        if content != original:
+            with open(p, 'w', encoding='utf-8') as f: f.write(content)
+            patched_files_count += 1
 
     # 5. 修复 edma_cfg_tx.h
-    for p in find_file('edma_cfg_tx.h', subpath_hint='qualcomm/ppe'):
+    for p in find_file('edma_cfg_tx.h'):
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
+        original = content
         content = re.sub(r'#define\s+EDMA_TX_NAPI_WORK_DEF\s+\d+', '#define EDMA_TX_NAPI_WORK_DEF\t64', content)
         content = re.sub(r'#define\s+EDMA_TX_NAPI_WORK_MAX\s+\d+', '#define EDMA_TX_NAPI_WORK_MAX\t64', content)
-        with open(p, 'w', encoding='utf-8') as f: f.write(content)
+        if content != original:
+            with open(p, 'w', encoding='utf-8') as f: f.write(content)
+            patched_files_count += 1
 
     print('Successfully applied recursive dynamic kernel patches via external script.')
 
