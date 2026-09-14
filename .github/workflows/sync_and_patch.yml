@@ -33,7 +33,7 @@ jobs:
         run: |
           git clone --depth 1 -b main https://github.com/openwrt/openwrt.git openwrt-src
 
-      - name: Apply OpenWrt Tree Patches
+      - name: Apply OpenWrt Tree Patches & Stage Kernel Patches
         run: |
           cd openwrt-src
           patch -p1 < ../config-repo/my_patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
@@ -57,6 +57,68 @@ jobs:
           make target/linux/{download,prepare} QUILT=1 V=s
           make package/kernel/mac80211/{download,prepare} QUILT=1 V=s
 
+      - name: Auto-Fix NAPI Budgets Dynamically (Bypass Patch Conflicts)
+        run: |
+          cd openwrt-src
+          
+          # 找到解压后的 Linux 内核源码路径
+          KERNEL_DIR=$(find build_dir/target-*/linux-* -maxdepth 1 -type d -name "linux-*" | head -n 1)
+          echo "Found kernel dir: $KERNEL_DIR"
+          
+          if [ -d "$KERNEL_DIR" ]; then
+            PYTHON_SCRIPT="$KERNEL_DIR/drivers/net/ethernet/qualcomm/ppe/edma.c"
+            if [ -f "$PYTHON_SCRIPT" ]; then
+              echo "Applying dynamic NAPI budget fixes..."
+              
+              # 使用 python 直接对内核源码中的目标变量进行安全替换，免疫行号冲突
+              python3 -c "
+              import glob
+              
+              # 1. 修复 edma.c 中的默认参数描述和 ipq9574_hw_info
+              for p in glob.glob('$KERNEL_DIR/drivers/net/ethernet/qualcomm/ppe/edma.c'):
+                  with open(p, 'r') as f: content = f.read()
+                  content = content.replace('MODULE_PARM_DESC(edma_rx_napi_budget, \"Rx NAPI budget (default:128, min:16, max:512)\")', 'MODULE_PARM_DESC(edma_rx_napi_budget, \"Rx NAPI budget (default:64, min:16, max:64)\")')
+                  content = content.replace('MODULE_PARM_DESC(edma_tx_napi_budget, \"Tx NAPI budget (default:512 for ipq95xx, min:16, max:512)\")', 'MODULE_PARM_DESC(edma_tx_napi_budget, \"Tx NAPI budget (default:64, min:16, max:64)\")')
+                  content = content.replace('.napi_budget_tx = 512,', '.napi_budget_tx = 64,')
+                  with open(p, 'w') as f: f.write(content)
+
+              # 2. 修复 edma_cfg_rx.c
+              for p in glob.glob('$KERNEL_DIR/drivers/net/ethernet/qualcomm/ppe/edma_cfg_rx.c'):
+                  with open(p, 'r') as f: content = f.read()
+                  content = content.replace('hw_info->napi_budget_rx', 'edma_rx_napi_budget')
+                  with open(p, 'w') as f: f.write(content)
+
+              # 3. 修复 edma_cfg_rx.h
+              for p in glob.glob('$KERNEL_DIR/drivers/net/ethernet/qualcomm/ppe/edma_cfg_rx.h'):
+                  with open(p, 'r') as f: content = f.read()
+                  content = content.replace('#define EDMA_RX_NAPI_WORK_DEF\t\t128', '#define EDMA_RX_NAPI_WORK_DEF\t\t64')
+                  content = content.replace('#define EDMA_RX_NAPI_WORK_MAX\t\t512', '#define EDMA_RX_NAPI_WORK_MAX\t\t64')
+                  with open(p, 'w') as f: f.write(content)
+
+              # 4. 修复 edma_cfg_tx.c
+              for p in glob.glob('$KERNEL_DIR/drivers/net/ethernet/qualcomm/ppe/edma_cfg_tx.c'):
+                  with open(p, 'r') as f: content = f.read()
+                  content = content.replace('hw_info->napi_budget_tx', 'edma_tx_napi_budget')
+                  with open(p, 'w') as f: content = f.read() if False else content # placeholder
+                  with open(p, 'w') as f: f.write(content)
+
+              # 5. 修复 edma_cfg_tx.h
+              for p in glob.glob('$KERNEL_DIR/drivers/net/ethernet/qualcomm/ppe/edma_cfg_tx.h'):
+                  with open(p, 'r') as f: content = f.read()
+                  content = content.replace('#define EDMA_TX_NAPI_WORK_DEF\t512', '#define EDMA_TX_NAPI_WORK_DEF\t64')
+                  content = content.replace('#define EDMA_TX_NAPI_WORK_MAX\t512', '#define EDMA_TX_NAPI_WORK_MAX\t64')
+                  with open(p, 'w') as f: f.write(content)
+              print('Successfully patched kernel code via Python script.')
+              "
+            else
+              echo "Error: edma.c not found in kernel tree."
+              exit 1
+            fi
+          else
+            echo "Error: Kernel build directory not found."
+            exit 1
+          fi
+          
       - name: Copy Custom Patches & Scripts
         run: |
           cp -r config-repo/patches openwrt-src/
