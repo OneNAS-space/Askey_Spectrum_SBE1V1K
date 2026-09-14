@@ -1,0 +1,103 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] wifi: ath12k: handle empty regulatory events
+
+---
+ drivers/net/wireless/ath/ath12k/wmi.c | 44 +++++++++++++++++------------
+ 1 file changed, 28 insertions(+), 16 deletions(-)
+
+--- a/drivers/net/wireless/ath/ath12k/wmi.c
++++ b/drivers/net/wireless/ath/ath12k/wmi.c
+@@ -5931,3 +5931,3 @@
+ 	u8 num_invalid_5ghz_ext_rules;
+-	u32 total_reg_rules = 0;
++	u32 status_code __maybe_unused, total_reg_rules = 0;
+ 	int ret, i, j;
+@@ -5940,6 +5940,40 @@
+ 		return -EPROTO;
+ 	}
+ 
++	memcpy(reg_info->alpha2, &ev->alpha2, REG_ALPHA2_LEN);
++	reg_info->dfs_region = le32_to_cpu(ev->dfs_region);
++	reg_info->phybitmap = le32_to_cpu(ev->phybitmap);
++	reg_info->num_phy = le32_to_cpu(ev->num_phy);
++	reg_info->phy_id = le32_to_cpu(ev->phy_id);
++	reg_info->ctry_code = le32_to_cpu(ev->country_id);
++	reg_info->reg_dmn_pair = le32_to_cpu(ev->domain_code);
++
++	status_code = le32_to_cpu(ev->status_code);
++	switch (status_code) {
++	case WMI_REG_SET_CC_STATUS_PASS:
++		reg_info->status_code = REG_SET_CC_STATUS_PASS;
++		break;
++	case WMI_REG_CURRENT_ALPHA2_NOT_FOUND:
++		reg_info->status_code = REG_CURRENT_ALPHA2_NOT_FOUND;
++		break;
++	case WMI_REG_INIT_ALPHA2_NOT_FOUND:
++		reg_info->status_code = REG_INIT_ALPHA2_NOT_FOUND;
++		break;
++	case WMI_REG_SET_CC_CHANGE_NOT_ALLOWED:
++		reg_info->status_code = REG_SET_CC_CHANGE_NOT_ALLOWED;
++		break;
++	case WMI_REG_SET_CC_STATUS_NO_MEMORY:
++		reg_info->status_code = REG_SET_CC_STATUS_NO_MEMORY;
++		break;
++	case WMI_REG_SET_CC_STATUS_FAIL:
++		reg_info->status_code = REG_SET_CC_STATUS_FAIL;
++		break;
++	default:
++		ath12k_warn(ab, "unknown regulatory status %u\n", status_code);
++		reg_info->status_code = REG_SET_CC_STATUS_FAIL;
++		break;
++	}
++
+ 	reg_info->num_2g_reg_rules = le32_to_cpu(ev->num_2g_reg_rules);
+ 	reg_info->num_5g_reg_rules = le32_to_cpu(ev->num_5g_reg_rules);
+ 	reg_info->num_6g_reg_rules_ap[WMI_REG_INDOOR_AP] =
+@@ -6080,8 +6114,7 @@
+ 
+ 	total_reg_rules = reg_info->num_2g_reg_rules + reg_info->num_5g_reg_rules;
+ 	if (!total_reg_rules) {
+-		ath12k_warn(ab, "No reg rules available\n");
+-		return -EINVAL;
++		return -ENODATA;
+ 	}
+ 
+ 	reg_info->reg_rules_2g_ptr = kzalloc(reg_info->num_2g_reg_rules *
+@@ -6995,28 +7028,35 @@
+ 	}
+ 
+ 	ret = ath12k_pull_reg_chan_list_ext_update_ev(ab, skb, reg_info);
++	if ((!ret || ret == -ENODATA) && reg_info->phy_id < ab->num_radios)
++		pdev_idx = reg_info->phy_id;
++
+ 	if (ret) {
+-		ath12k_warn(ab, "failed to extract regulatory info from received event\n");
++		if (ret == -ENODATA && pdev_idx != 255) {
++			/* Keep the last valid regdomain, but finish this update. */
++			ret = ATH12K_REG_STATUS_VALID;
++		} else {
++			ath12k_warn(ab, "failed to extract regulatory info from received event\n");
++		}
+ 		goto mem_free;
+ 	}
+ 
+ 	ret = ath12k_reg_validate_reg_info(ab, reg_info);
+ 	if (ret == ATH12K_REG_STATUS_FALLBACK) {
+ 		ath12k_warn(ab, "failed to validate reg info %d\n", ret);
+ 		/* firmware has successfully switches to new regd but host can not
+ 		 * continue, so free reginfo and fallback to old regd
+ 		 */
+ 		goto mem_free;
+ 	} else if (ret == ATH12K_REG_STATUS_DROP) {
+ 		/* reg info is valid but we will not store it and
+ 		 * not going to create new regd for it
+ 		 */
+ 		ret = ATH12K_REG_STATUS_VALID;
+ 		goto mem_free;
+ 	}
+ 
+ 	/* free old reg_info if it exist */
+-	pdev_idx = reg_info->phy_id;
+ 	if (ab->reg_info[pdev_idx]) {
+ 		ath12k_reg_reset_reg_info(ab->reg_info[pdev_idx]);
+ 		kfree(ab->reg_info[pdev_idx]);
