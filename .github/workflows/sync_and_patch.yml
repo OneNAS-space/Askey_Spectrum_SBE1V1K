@@ -33,10 +33,9 @@ jobs:
         run: |
           git clone --depth 1 -b main https://github.com/openwrt/openwrt.git openwrt-src
 
-      - name: Apply OpenWrt Tree Patches
+      - name: Override DTS file
         run: |
-          cd openwrt
-          patch -p1 < ../patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
+          cp -f patches/ipq9570-sbe1v1k.dts openwrt-src/target/linux/qualcommbe/dts/ipq9570-sbe1v1k.dts
 
       - name: Select Target (qualcommbe / ipq95xx)
         run: |
