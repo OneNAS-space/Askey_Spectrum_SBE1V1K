@@ -3,7 +3,7 @@ Date: Sun, 16 Aug 2026 00:41:53 +0800
 Subject: [PATCH] net: ethernet: qualcomm: honor safe NAPI budgets
 
 The EDMA module parameters are validated and reported, but the NAPI instances
-are registered with the fixed values from edma_hw_info instead.  On IPQ9574
+are registered with the fixed values from edma_hw_info instead. On IPQ9574
 the TX value is 512, which makes the networking core emit a warning because
 it exceeds NAPI_POLL_WEIGHT.
 
@@ -12,6 +12,13 @@ them to the networking core's standard budget, and make the IPQ9574 fallback
 safe as well.
 
 Signed-off-by: Yang Zhengguo <yangzhgg@gmail.com>
+---
+ drivers/net/ethernet/qualcomm/ppe/edma.c        | 6 +++---
+ drivers/net/ethernet/qualcomm/ppe/edma_cfg_rx.c | 2 +-
+ drivers/net/ethernet/qualcomm/ppe/edma_cfg_rx.h | 4 ++--
+ drivers/net/ethernet/qualcomm/ppe/edma_cfg_tx.c | 2 +-
+ drivers/net/ethernet/qualcomm/ppe/edma_cfg_tx.h | 4 ++--
+ 5 files changed, 9 insertions(+), 9 deletions(-)
 
 --- a/drivers/net/ethernet/qualcomm/ppe/edma.c
 +++ b/drivers/net/ethernet/qualcomm/ppe/edma.c
