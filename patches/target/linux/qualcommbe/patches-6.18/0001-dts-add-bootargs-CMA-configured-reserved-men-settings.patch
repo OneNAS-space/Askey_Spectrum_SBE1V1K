@@ -1,9 +1,10 @@
-From 82fc7da8cdf2694d9943b28c6a2be1c2d1153d47 Mon Sep 17 00:00:00 2001
+From 2ab4190f6a5629732a2f4e8efb6b61ce09402f58 Mon Sep 17 00:00:00 2001
 From: Jackie264 <jackie.han@gmail.com>
-Date: Sat, 12 Sep 2026 17:57:51 +0800
-Subject: [PATCH] Update device tree for ipq9570-sbe1v1k
+Date: Mon, 14 Sep 2026 20:30:00 +0800
+Subject: [PATCH] Update device tree for ipq9570 with memory and regulator
+ changes
 
-Added bootargs for CMA and configured reserved memory settings. Disabled unused QCE nodes to prevent clock controller issues.
+Added reserved memory configurations and adjusted regulator settings for improved performance. Disabled unused QCE nodes to prevent clock controller issues.
 
 Signed-off-by: Jackie264 <jackie.han@gmail.com>
 ---
