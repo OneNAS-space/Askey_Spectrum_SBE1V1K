@@ -31,7 +31,7 @@ jobs:
 
       - name: Fetch OpenWrt Upstream
         run: |
-          git clone --depth 1 -b main https://github.com/openwrt/openwrt.git openwrt-src
+          git clone --single-branch -b main https://github.com/openwrt/openwrt.git openwrt-src
 
       - name: Apply OpenWrt Tree Patches & Stage Kernel Patches
         run: |
@@ -54,43 +54,61 @@ jobs:
           make target/linux/{download,prepare} QUILT=1 V=s
           make package/kernel/mac80211/{download,prepare} QUILT=1 V=s
 
-      - name: Auto-Fix NAPI Budgets Dynamically
+      - name: Auto-Fix NAPI Budgets & Generate Kernel Patch
         run: |
           cd openwrt-src
+          export ROOT_DIR=$PWD
           
           # 寻找并导出内核解压路径
           export KERNEL_DIR=$(find build_dir/target-*/linux-* -maxdepth 1 -type d -name "linux-*" | head -n 1)
           echo "Found kernel dir: $KERNEL_DIR"
           
           if [ -d "$KERNEL_DIR" ]; then
-            # 直接执行复制过来的独立 Python 脚本
+            KERNEL_PARENT=$(dirname "$KERNEL_DIR")
+            KERNEL_BASENAME=$(basename "$KERNEL_DIR")
+            
+            # 【核心魔法1】备份原始内核目录
+            cd "$ROOT_DIR/$KERNEL_PARENT"
+            cp -a "$KERNEL_BASENAME" "${KERNEL_BASENAME}.orig"
+            
+            # 【核心魔法2】回到根目录，执行你的 Python 动态修改脚本（修改真实的内核目录）
+            cd "$ROOT_DIR"
             python3 ../config-repo/scripts/fix_napi_budget.py
+            
+            # 【核心魔法3】对比原始目录和修改后的目录，自动生成标准 OpenWrt 补丁并存入源码树
+            cd "$ROOT_DIR/$KERNEL_PARENT"
+            diff -urN "${KERNEL_BASENAME}.orig" "$KERNEL_BASENAME" > "$ROOT_DIR/target/linux/qualcommbe/patches-6.18/999-dynamic-napi-budgets.patch" || true
+            
+            # 清理备份临时文件，释放空间
+            rm -rf "${KERNEL_BASENAME}.orig"
+            
+            echo "Successfully generated dynamic patch at target/linux/qualcommbe/patches-6.18/999-dynamic-napi-budgets.patch"
           else
             echo "Error: Kernel build directory not found."
             exit 1
           fi
 
-      - name: Clean Overlay Dirs and Push
+      - name: Commit and Push to Branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd openwrt-src
-          rm -rf patches scripts
           
-          # 【核心修复】删除 OpenWrt 官方自带的 .github 目录，防止触发 GitHub 权限拦截
+          # 【修复2】删除官方自带的 GitHub Actions 目录，避开 workflows 修改权限拦截
           rm -rf .github
 
-          # 重新初始化为一个全新的干净仓库
-          rm -rf .git
-          git init
-          git branch -M Askey_Spectrum_SBE1V1K
+          # 切换到你的专属分支，这一步会继承官方 main 分支的所有历史提交！
+          git checkout -b Askey_Spectrum_SBE1V1K
           
+          # 配置 Git 机器人信息
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
+          
           git remote add target "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
 
+          # 此时 git add . 会忽略 build_dir，但会准确捕捉到修改的 DTS 以及我们自动生成的 999 补丁
           git add .
-          git commit -m "Auto-apply patches and config for Askey SBE1V1K"
+          git commit -m "Auto-apply patches and dynamic NAPI configs for Askey SBE1V1K"
 
+          # 连同官方完整的历史一起，强制推送到你的个人仓库分支中
           git push target Askey_Spectrum_SBE1V1K --force
