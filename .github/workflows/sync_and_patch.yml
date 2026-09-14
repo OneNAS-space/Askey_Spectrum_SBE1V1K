@@ -36,7 +36,7 @@ jobs:
       - name: Apply OpenWrt Tree Patches
         run: |
           cd openwrt
-          patch -p1 < ../my-patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
+          patch -p1 < ../patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
 
       - name: Select Target (qualcommbe / ipq95xx)
         run: |
