@@ -67,7 +67,7 @@ jobs:
           
           if [ -d "$KERNEL_DIR" ]; then
             # 直接执行复制过来的独立 Python 脚本
-            python3 scripts/fix_napi_budget.py
+            python3 ../config-repo/scripts/fix_napi_budget.py
           else
             echo "Error: Kernel build directory not found."
             exit 1
