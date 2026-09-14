@@ -63,8 +63,12 @@ process_group() {
     local mode=""
     if (cd "$baseline_dir" && patch -p1 --dry-run < "$OLDPWD/$p" >/dev/null 2>&1); then
       mode="精确"
+      # 【关键修复】：必须真实打入代码，为下一个互相依赖的补丁提供上下文
+      (cd "$baseline_dir" && patch -p1 < "$OLDPWD/$p" >/dev/null 2>&1)
     elif (cd "$baseline_dir" && patch -p1 --fuzz=3 --dry-run < "$OLDPWD/$p" >/dev/null 2>&1); then
       mode="模糊(fuzz=3，建议复核)"
+      # 【关键修复】：真实打入代码
+      (cd "$baseline_dir" && patch -p1 --fuzz=3 < "$OLDPWD/$p" >/dev/null 2>&1)
     else
       echo "❌ 冲突，需人工处理：$name" | tee -a "$SUMMARY"
       CONFLICTS+=("$name")
