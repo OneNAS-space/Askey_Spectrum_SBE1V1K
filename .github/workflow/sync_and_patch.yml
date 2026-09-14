@@ -1,0 +1,51 @@
+name: Sync OpenWrt Main and Auto Patch
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # 每 6 小时运行一次
+  workflow_dispatch:     # 支持手动点按钮运行
+
+jobs:
+  sync-and-patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Default Branch (Main)
+        uses: actions/checkout@v4
+        with:
+          path: config-repo
+
+      - name: Configure Git Identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch OpenWrt Upstream
+        run: |
+          git clone --depth 1 -b main https://github.com/openwrt/openwrt.git openwrt-src
+
+      - name: Run Auto-Patcher
+        run: |
+          # 将补丁和脚本复制到 OpenWrt 源码根目录
+          cp -r config-repo/patches openwrt-src/
+          cp -r config-repo/scripts openwrt-src/
+          
+          cd openwrt-src
+          chmod +x ./scripts/apply_patches.sh
+          ./scripts/apply_patches.sh
+
+      - name: Force Push to Askey_Spectrum_SBE1V1K Branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd openwrt-src
+          # 清理临时复制进去的脚本文件夹，保持分支干净
+          rm -rf patches scripts
+          
+          git remote add target "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          git checkout -b Askey_Spectrum_SBE1V1K
+          git add .
+          git commit --amend --no-edit || true
+          git push target Askey_Spectrum_SBE1V1K --force
