@@ -33,6 +33,11 @@ jobs:
         run: |
           git clone --depth 1 -b main https://github.com/openwrt/openwrt.git openwrt-src
 
+      - name: Apply OpenWrt Tree Patches
+        run: |
+          cd openwrt
+          patch -p1 < ../my-patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
+
       - name: Select Target (qualcommbe / ipq95xx)
         run: |
           cd openwrt-src
