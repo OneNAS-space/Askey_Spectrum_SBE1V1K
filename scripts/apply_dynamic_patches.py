@@ -3,7 +3,8 @@ import os, sys, re, glob, difflib, tempfile, subprocess
  
 from patch_specs import PATCH_SPECS
 
-# ---- 多棵源码树的定义：env var 提供实际目录 + 补丁最终落地的相对路径 ----
+# ---- Definition of multiple source code trees: env var provides the actual directory 
+# and the relative path of the final landing of the patch ----
 TREES = {
     'kernel': {
         'dir_env': 'KERNEL_DIR',
@@ -29,7 +30,7 @@ def resolve_tree_dir(tree_key):
                 d = matches[0]
 
     if not d or not os.path.isdir(d):
-        print(f"Error: {env_name} 未设置或目录不存在: {d}")
+        print(f"Error: {env_name} Not set or the directory does not exist: {d}")
         sys.exit(1)
     return os.path.abspath(d)
 
@@ -55,13 +56,13 @@ def format_diff_range(start, stop):
     if length == 1:
         return f"{start + 1}"
     if length == 0:
-        return f"{start},0"  # 纯插入时取插入位置前一行的行号
+        return f"{start},0"  # Take the line number of the line before the insertion position when inserting purely.
     return f"{start + 1},{length}"
 
 def make_unified_diff(base_dir, path, original, updated):
     relpath = os.path.relpath(path, base_dir)
     
-    # ---- 优先使用系统的 git diff --no-index 或 diff -u 生成 Linux 内核级别的规范补丁 ----
+    # ---- Give priority to using the system's git diff --no-index or diff -u to generate Linux kernel-level specification patches ----
     f1_path, f2_path = None, None
     try:
         with tempfile.NamedTemporaryFile('w', delete=False, encoding='utf-8') as f1, \
@@ -70,7 +71,7 @@ def make_unified_diff(base_dir, path, original, updated):
             f2.write(updated)
             f1_path, f2_path = f1.name, f2.name
 
-        # 1. 尝试 git diff --no-index (带缩进启发算法，不会错位大括号)
+        # 1. Try git diff --no-index (with indentation inspirational algorithm, will not misplace the brackets)
         cmd = ['git', 'diff', '--no-index', '-u', f1_path, f2_path]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.stdout:
@@ -82,7 +83,7 @@ def make_unified_diff(base_dir, path, original, updated):
                 out.append(line)
             return ''.join(out)
 
-        # 2. 尝试系统 diff -u
+        # 2. Try the system diff -u
         cmd = ['diff', '-u', f1_path, f2_path]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.stdout:
@@ -99,7 +100,7 @@ def make_unified_diff(base_dir, path, original, updated):
         if f2_path and os.path.exists(f2_path):
             os.remove(f2_path)
 
-    # ---- 3. Python pure difflib 兜底 ----
+    # ---- 3. Python pure difflib ----
     a = original.splitlines(keepends=True)
     b = updated.splitlines(keepends=True)
     matcher = difflib.SequenceMatcher(None, a, b, autojunk=False)
@@ -134,10 +135,10 @@ def apply_spec(content, spec, label):
             n = content.count(pat)
             new_content = content.replace(pat, repl) if n else content
         if n == 0:
-            print(f"  !! [{label}] 第 {idx}/{len(spec['replacements'])} 条替换未命中，请检查该处上下文")
+            print(f"  !! [{label}] 第 {idx}/{len(spec['replacements'])} The replacement is not hit. Please check the context there.")
         else:
             if n > 1:
-                print(f"  !! [{label}] 第 {idx}/{len(spec['replacements'])} 条替换命中 {n} 次(预期 1 次)，请人工核对")
+                print(f"  !! [{label}] 第 {idx}/{len(spec['replacements'])} Strip replacement hit {n} times (expected 1 time), please check manually.")
             content = new_content
             applied_count += n
     return content, applied_count
@@ -167,12 +168,12 @@ def main():
                 parent_dir_exact=spec.get('parent_dir_exact'),
             )
             if len(candidates) > 1:
-                print(f"  !! [{name}] 警告：{spec['filename']} 找到 {len(candidates)} 个候选，可能存在残留副本：")
+                print(f"  !! [{name}] Warning: {spec['filename']} Find {len(candidates)} candidates, and there may be residual copies:")
                 for c in candidates:
                     print(f"       - {c}")
             
             if not candidates:
-                print(f"  !! [{name}] 错误：未找到目标文件 {spec['filename']} (限定条件: {spec['path_must_contain']})")
+                print(f"  !! [{name}] Error: The target file was not found {spec['filename']} (QUALIFIED CONDITIONS: {spec['path_must_contain']})")
                 continue
 
             spec_matched = False
@@ -187,10 +188,10 @@ def main():
                         f.write(content)
                     combined_diff += make_unified_diff(base_dir, p, original, content)
                     total_patched += 1
-                    print(f"  [{name}] 已修改: {os.path.relpath(p, base_dir)}")
+                    print(f"  [{name}] Modified: {os.path.relpath(p, base_dir)}")
 
             if not spec_matched:
-                print(f"  !! [{name}] 提示：找到了文件 {spec['filename']}，但未匹配到替换内容（代码已被修改过或上下文不一致）")
+                print(f"  !! [{name}] Tip: The file {spec['filename']} was found, but it did not match the replacement content (the code has been modified or the context is inconsistent)")
 
         if combined_diff:
             patch_dir = os.path.join(root_dir, TREES[tree_key]['patch_dir_rel'])
@@ -198,10 +199,10 @@ def main():
             out_path = os.path.join(patch_dir, f'{name}.patch')
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(combined_diff)
-            print(f"✅ 已生成 {out_path}")
+            print(f"✅ Generated {out_path}")
 
     if total_patched == 0:
-        print("❌ 错误：没有任何文件被修改")
+        print("❌ Error: No documents have been modified.")
         sys.exit(1)
 
 if __name__ == '__main__':
