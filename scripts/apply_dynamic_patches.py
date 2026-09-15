@@ -234,8 +234,8 @@ PATCH_SPECS = [
         'replacements': [
             # 1. 增加 status_code 局部变量（精准捕捉 total_reg_rules 声明行）
             (
-                r'(u32\s+total_reg_rules\s*=\s*0\s*;)',
-                r'u32 status_code __maybe_unused, \1'
+                r'u32(\s+total_reg_rules\s*=\s*0\s*;)',
+                r'u32 status_code __maybe_unused,\1'
             ),
             # 2. 插入 status_code 解析 switch 块（锚定在 reg_info 给 2G 规则赋值的开端）
             (
@@ -281,15 +281,21 @@ PATCH_SPECS = [
             ),
             # 4. 提前赋值 pdev_idx，并区分 -ENODATA 分支
             (
-                r'(\t)(ret\s*=\s*ath12k_pull_reg_chan_list_ext_update_ev\(ab,\s*skb,\s*reg_info\);\n\s*if\s*\(ret\)\s*\{)',
-                r'\1ret = ath12k_pull_reg_chan_list_ext_update_ev(ab, skb, reg_info);\n'
+                r'(\t)(ret\s*=\s*ath12k_pull_reg_chan_list_ext_update_ev\(ab,\s*skb,\s*reg_info\);\n)'
+                r'(?:\s*if\s*\(ret\)\s*\{\n)'
+                r'\s*(ath12k_warn\(ab,\s*"failed to extract regulatory info from received event\\n"\);\n)',
+
+                r'\1\2'
                 r'\1if ((!ret || ret == -ENODATA) && reg_info->phy_id < ab->num_radios)\n'
-                r'\1\tpdev_idx = reg_info->phy_id;\n\n'
+                r'\1\tpdev_idx = reg_info->phy_id;\n'
+                r'\n'
                 r'\1if (ret) {\n'
                 r'\1\tif (ret == -ENODATA && pdev_idx != 255) {\n'
                 r'\1\t\t/* Keep the last valid regdomain, but finish this update. */\n'
                 r'\1\t\tret = ATH12K_REG_STATUS_VALID;\n'
-                r'\1\t} else'
+                r'\1\t} else {\n'
+                r'\1\t\t\3'
+                r'\1\t}\n'
             ),
             # 5. 删除后面重复的 pdev_idx 赋值
             (
@@ -300,20 +306,20 @@ PATCH_SPECS = [
     }
 ]
 
-def apply_spec(content, spec):
+def apply_spec(content, spec, label):
     applied_count = 0
-    if spec['kind'] == 'regex':
-        for pat, repl in spec['replacements']:
+    for idx, (pat, repl) in enumerate(spec['replacements'], 1):
+        if spec['kind'] == 'regex':
             new_content, n = re.subn(pat, repl, content)
-            if n > 0:
-                content = new_content
-                applied_count += n
-        return content, applied_count
-
-    for old, new in spec['replacements']:
-        n = content.count(old)
-        if n > 0:
-            content = content.replace(old, new)
+        else:
+            n = content.count(pat)
+            new_content = content.replace(pat, repl) if n else content
+        if n == 0:
+            print(f"  !! [{label}] 第 {idx}/{len(spec['replacements'])} 条替换未命中，请检查该处上下文")
+        else:
+            if n > 1:
+                print(f"  !! [{label}] 第 {idx}/{len(spec['replacements'])} 条替换命中 {n} 次(预期 1 次)，请人工核对")
+            content = new_content
             applied_count += n
     return content, applied_count
 
