@@ -154,6 +154,115 @@ PATCH_SPECS = [
             ),
         ],
     },
+    {
+        'tree': 'mac80211',
+        'name': '106-wifi-ath12k-handle-empty-regulatory-events',
+        'filename': 'wmi.c',
+        'path_must_contain': ('ath12k',),
+        'kind': 'literal',
+        'replacements': [
+            # 1. 增加 status_code 局部变量
+            (
+                '\tu8 num_invalid_5ghz_ext_rules;\n'
+                '\tu32 total_reg_rules = 0;\n'
+                '\tint ret, i, j;',
+
+                '\tu8 num_invalid_5ghz_ext_rules;\n'
+                '\tu32 status_code __maybe_unused, total_reg_rules = 0;\n'
+                '\tint ret, i, j;'
+            ),
+            # 2. 插入状态码解析 switch 块
+            (
+                '\t\treturn -EPROTO;\n'
+                '\t}\n'
+                '\n'
+                '\treg_info->num_2g_reg_rules = le32_to_cpu(ev->num_2g_reg_rules);',
+
+                '\t\treturn -EPROTO;\n'
+                '\t}\n'
+                '\n'
+                '\tmemcpy(reg_info->alpha2, &ev->alpha2, REG_ALPHA2_LEN);\n'
+                '\treg_info->dfs_region = le32_to_cpu(ev->dfs_region);\n'
+                '\treg_info->phybitmap = le32_to_cpu(ev->phybitmap);\n'
+                '\treg_info->num_phy = le32_to_cpu(ev->num_phy);\n'
+                '\treg_info->phy_id = le32_to_cpu(ev->phy_id);\n'
+                '\treg_info->ctry_code = le32_to_cpu(ev->country_id);\n'
+                '\treg_info->reg_dmn_pair = le32_to_cpu(ev->domain_code);\n'
+                '\n'
+                '\tstatus_code = le32_to_cpu(ev->status_code);\n'
+                '\tswitch (status_code) {\n'
+                '\tcase WMI_REG_SET_CC_STATUS_PASS:\n'
+                '\t\treg_info->status_code = REG_SET_CC_STATUS_PASS;\n'
+                '\t\tbreak;\n'
+                '\tcase WMI_REG_CURRENT_ALPHA2_NOT_FOUND:\n'
+                '\t\treg_info->status_code = REG_CURRENT_ALPHA2_NOT_FOUND;\n'
+                '\t\tbreak;\n'
+                '\tcase WMI_REG_INIT_ALPHA2_NOT_FOUND:\n'
+                '\t\treg_info->status_code = REG_INIT_ALPHA2_NOT_FOUND;\n'
+                '\t\tbreak;\n'
+                '\tcase WMI_REG_SET_CC_CHANGE_NOT_ALLOWED:\n'
+                '\t\treg_info->status_code = REG_SET_CC_CHANGE_NOT_ALLOWED;\n'
+                '\t\tbreak;\n'
+                '\tcase WMI_REG_SET_CC_STATUS_NO_MEMORY:\n'
+                '\t\treg_info->status_code = REG_SET_CC_STATUS_NO_MEMORY;\n'
+                '\t\tbreak;\n'
+                '\tcase WMI_REG_SET_CC_STATUS_FAIL:\n'
+                '\t\treg_info->status_code = REG_SET_CC_STATUS_FAIL;\n'
+                '\t\tbreak;\n'
+                '\tdefault:\n'
+                '\t\tath12k_warn(ab, "unknown regulatory status %u\\n", status_code);\n'
+                '\t\treg_info->status_code = REG_SET_CC_STATUS_FAIL;\n'
+                '\t\tbreak;\n'
+                '\t}\n'
+                '\n'
+                '\treg_info->num_2g_reg_rules = le32_to_cpu(ev->num_2g_reg_rules);'
+            ),
+            # 3. 空规则时的返回值从 -EINVAL 改为 -ENODATA，去掉警告
+            (
+                '\ttotal_reg_rules = reg_info->num_2g_reg_rules + reg_info->num_5g_reg_rules;\n'
+                '\tif (!total_reg_rules) {\n'
+                '\t\tath12k_warn(ab, "No reg rules available\\n");\n'
+                '\t\treturn -EINVAL;\n'
+                '\t}',
+
+                '\ttotal_reg_rules = reg_info->num_2g_reg_rules + reg_info->num_5g_reg_rules;\n'
+                '\tif (!total_reg_rules) {\n'
+                '\t\treturn -ENODATA;\n'
+                '\t}'
+            ),
+            # 4. 提前赋值 pdev_idx，并区分 -ENODATA 的处理分支
+            (
+                '\tret = ath12k_pull_reg_chan_list_ext_update_ev(ab, skb, reg_info);\n'
+                '\tif (ret) {\n'
+                '\t\tath12k_warn(ab, "failed to extract regulatory info from received event\\n");\n'
+                '\t\tgoto mem_free;\n'
+                '\t}',
+
+                '\tret = ath12k_pull_reg_chan_list_ext_update_ev(ab, skb, reg_info);\n'
+                '\tif ((!ret || ret == -ENODATA) && reg_info->phy_id < ab->num_radios)\n'
+                '\t\tpdev_idx = reg_info->phy_id;\n'
+                '\n'
+                '\tif (ret) {\n'
+                '\t\tif (ret == -ENODATA && pdev_idx != 255) {\n'
+                '\t\t\t/* Keep the last valid regdomain, but finish this update. */\n'
+                '\t\t\tret = ATH12K_REG_STATUS_VALID;\n'
+                '\t\t} else {\n'
+                '\t\t\tath12k_warn(ab, "failed to extract regulatory info from received event\\n");\n'
+                '\t\t}\n'
+                '\t\tgoto mem_free;\n'
+                '\t}'
+            ),
+            # 5. 删掉后面重复的 pdev_idx 赋值（现在已经提前赋过了）
+            (
+                '\t/* free old reg_info if it exist */\n'
+                '\tpdev_idx = reg_info->phy_id;\n'
+                '\tif (ab->reg_info[pdev_idx]) {',
+
+                '\t/* free old reg_info if it exist */\n'
+                '\tif (ab->reg_info[pdev_idx]) {'
+            ),
+        ],
+    }
 ]
 
 def apply_spec(content, spec, label):
