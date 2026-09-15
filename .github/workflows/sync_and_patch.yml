@@ -48,6 +48,17 @@ jobs:
           echo "CONFIG_TARGET_qualcommbe_ipq95xx_DEVICE_askey_sbe1v1k=y" >> .config
           make defconfig
 
+      - name: Debug Quilt Patch State
+        run: |
+          cd openwrt-src
+          KDIR=$(ls -d build_dir/target-*/linux-*/linux-6.* | grep -v orig | head -n1)
+          echo "=== applied-patches ==="
+          cat "$KDIR/.pc/applied-patches" 2>&1 | tail -30
+          echo "=== does edma.c exist anywhere at all? ==="
+          find "$KDIR" -iname 'edma*' 2>&1
+          echo "=== quilt series vs applied ==="
+          wc -l target/linux/qualcommbe/patches-6.18/series 2>/dev/null || ls target/linux/qualcommbe/patches-6.18/*.patch | wc -l
+    
       - name: Prepare Upstream Baseline Sources
         run: |
           cd openwrt-src
