@@ -139,7 +139,7 @@ PATCH_SPECS = [
         'tree': 'mac80211',
         'name': '105-wifi-ath12k-support-CV-upload-direct-buffer-module',
         'filename': 'wmi.h',
-        'path_must_contain': ('ath12k',),
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
         'kind': 'literal',
         'replacements': [
             # 仅匹配唯一标识行，不依赖后续的换行和注释
@@ -153,7 +153,7 @@ PATCH_SPECS = [
         'tree': 'mac80211',
         'name': '106-wifi-ath12k-handle-empty-regulatory-events',
         'filename': 'wmi.c',
-        'path_must_contain': ('ath12k',),
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
         'kind': 'regex',  # 改用正则，对 backports-7.2 代码差异免疫
         'replacements': [
             # 1. 增加 status_code 局部变量（精准捕捉 total_reg_rules 声明行）
@@ -163,7 +163,7 @@ PATCH_SPECS = [
             ),
             # 2. 插入 status_code 解析 switch 块（锚定在 reg_info 给 2G 规则赋值的开端）
             (
-                r'(\s*)(reg_info->num_2g_reg_rules\s*=\s*le32_to_cpu\(ev->num_2g_reg_rules\);)',
+                r'(\t)(reg_info->num_2g_reg_rules\s*=\s*le32_to_cpu\(ev->num_2g_reg_rules\);)',
                 r'\1memcpy(reg_info->alpha2, &ev->alpha2, REG_ALPHA2_LEN);\n'
                 r'\1reg_info->dfs_region = le32_to_cpu(ev->dfs_region);\n'
                 r'\1reg_info->phybitmap = le32_to_cpu(ev->phybitmap);\n'
@@ -200,8 +200,8 @@ PATCH_SPECS = [
             ),
             # 3. 空规则处理：将 -EINVAL 改为 -ENODATA 并移除警告
             (
-                r'(if\s*\(!total_reg_rules\)\s*\{\n)\s*ath12k_warn\([^)]+\);\n\s*return\s+-EINVAL;',
-                r'\1\t\treturn -ENODATA;'
+                r'if\s*\(!total_reg_rules\)\s*\{\n[ \t]*ath12k_warn\([^)]+\);\n[ \t]*return\s+-EINVAL;',
+                "if (!total_reg_rules) {\n\t\treturn -ENODATA;"
             ),
             # 4. 提前赋值 pdev_idx，并区分 -ENODATA 分支
             (
@@ -224,20 +224,22 @@ PATCH_SPECS = [
     }
 ]
 
-def apply_spec(content, spec, label):
+def apply_spec(content, spec):
+    applied_count = 0
     if spec['kind'] == 'regex':
         for pat, repl in spec['replacements']:
-            content = re.sub(pat, repl, content)
-        return content
+            new_content, n = re.subn(pat, repl, content)
+            if n > 0:
+                content = new_content
+                applied_count += n
+        return content, applied_count
+
     for old, new in spec['replacements']:
         n = content.count(old)
-        if n == 0:
-            print(f"  !! [{label}] 警告：未找到预期字符串，上游代码可能已变化: {old!r}")
-            continue
-        if n > 1:
-            print(f"  !! [{label}] 警告：字符串出现 {n} 次(预期1次)，已全部替换，请人工核对: {old!r}")
-        content = content.replace(old, new)
-    return content
+        if n > 0:
+            content = content.replace(old, new)
+            applied_count += n
+    return content, applied_count
 
 def main():
     grouped = {}
@@ -245,7 +247,7 @@ def main():
         tree_key = spec.get('tree', 'kernel')
         grouped.setdefault((tree_key, spec['name']), []).append(spec)
 
-    tree_dirs = {}  # 每棵树只 resolve 一次
+    tree_dirs = {}
     total_patched = 0
 
     for (tree_key, name), specs in grouped.items():
@@ -256,18 +258,24 @@ def main():
 
         combined_diff = ''
         for spec in specs:
-            for p in find_file(base_dir, spec['filename'], spec['path_must_contain']):
+            candidates = find_file(base_dir, spec['filename'], spec['path_must_contain'])
+            spec_matched = False
+            
+            for p in candidates:
                 with open(p, 'r', encoding='utf-8', errors='ignore') as f:
                     original = f.read()
-                content = apply_spec(original, spec, name)
+                
+                content, applied_count = apply_spec(original, spec)
                 if content != original:
+                    spec_matched = True
                     with open(p, 'w', encoding='utf-8') as f:
                         f.write(content)
                     combined_diff += make_unified_diff(base_dir, p, original, content)
                     total_patched += 1
                     print(f"  [{name}] 已修改: {os.path.relpath(p, base_dir)}")
-                else:
-                    print(f"  !! [{name}] 未找到目标文件或内容未变化: {spec['filename']}")
+
+            if not spec_matched:
+                print(f"  !! [{name}] 警告：未找到匹配的目标代码或内容未变化 ({spec['filename']})")
 
         if combined_diff:
             patch_dir = os.path.join(os.environ['ROOT_DIR'], TREES[tree_key]['patch_dir_rel'])
