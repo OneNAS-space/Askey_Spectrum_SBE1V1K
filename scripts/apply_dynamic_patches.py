@@ -27,11 +27,17 @@ def resolve_tree_dir(tree_key):
 
 def find_file(base_dir, filename, path_must_contain=()):
     matches = []
+    seen_real = set()
     for root, dirs, files in os.walk(base_dir, followlinks=True):
         if filename in files:
             full_path = os.path.join(root, filename)
-            if all(part in full_path for part in path_must_contain):
-                matches.append(full_path)
+            if not all(part in full_path for part in path_must_contain):
+                continue
+            real = os.path.realpath(full_path)
+            if real in seen_real:
+                continue  # 同一份物理文件的另一条路径，跳过
+            seen_real.add(real)
+            matches.append(full_path)
     return matches
 
 def make_unified_diff(base_dir, path, original, updated):
