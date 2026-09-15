@@ -500,7 +500,7 @@ PATCH_SPECS = [
             ),
             # 2. 在 ath12k_mac_setup_iface_combinations 中添加 struct mac_address *addresses;
             (
-                r'([ \t]*struct wiphy_radio \*radio;\n)',
+                r'(struct wiphy \*wiphy = ah->hw->wiphy;\n[ \t]*struct wiphy_radio \*radio;\n)',
                 r'\1\tstruct mac_address *addresses;\n'
             ),
             # 3. 增加 addresses 内存分配，并更新 radio 分配失败后的 goto 异常跳转标签
@@ -530,8 +530,8 @@ PATCH_SPECS = [
             ),
             # 6. 在错误清理节点中追加 kfree(addresses)
             (
-                r'(err_free_radios:\s*\n[ \t]*kfree\(radio\);\n)',
-                r'\1\nerr_free_addresses:\n\tkfree(addresses);\n'
+                r'([ \t]*kfree\(radio\);\n\n)(err_free_combinations:)',
+                r'\1err_free_addresses:\n\tkfree(addresses);\n\n\2'
             ),
             # 7. 在 ath12k_mac_hw_register 中为单 Radio 设备从 DT 读取 MAC 地址
             (
