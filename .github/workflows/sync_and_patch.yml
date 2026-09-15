@@ -51,7 +51,7 @@ jobs:
       - name: Debug Quilt Patch State
         run: |
           cd openwrt-src
-          KDIR=$(ls -d build_dir/target-*/linux-*/linux-6.* | grep -v orig | head -n1)
+          KDIR=$(ls -d build_dir/target-aarch64_cortex-a53_musl/linux-qualcommbe_ipq95xx/linux-6.18.44 | grep -v orig | head -n1)
           echo "=== applied-patches ==="
           cat "$KDIR/.pc/applied-patches" 2>&1 | tail -30
           echo "=== does edma.c exist anywhere at all? ==="
