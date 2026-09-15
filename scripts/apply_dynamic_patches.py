@@ -346,6 +346,45 @@ PATCH_SPECS = [
             ),
         ],
     },
+    {
+        'tree': 'mac80211',
+        'name': '109-wifi-ath12k-log-WMI-control-service-topology',
+        'filename': 'wmi.c',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 1. 局部变量声明处追加 ag 与 wsi_controller 定义
+            (
+                r'(static int ath12k_connect_pdev_htc_service\s*\([^)]*\)\s*\{\n\s*int status;)',
+                r'\1\n\tstruct ath12k_hw_group *ag = ath12k_ab_to_ag(ab);\n\tbool wsi_controller;'
+            ),
+            # 2. 连接前解析 wsi-controller 节点并输出拓扑 Debug 日志
+            (
+                r'(\tconn_req\.service_id\s*=\s*svc_id\[pdev_idx\];\n)',
+                r'\1\n'
+                r'\twsi_controller = ab->dev->of_node &&\n'
+                r'\t\tof_property_read_bool(ab->dev->of_node, "qcom,wsi-controller");\n\n'
+                r'\tath12k_dbg(ab, ATH12K_DBG_WMI,\n'
+                r'\t\t   "WMI control connect pdev %u service 0x%x endpoints %d max-radios %d qmi-radios %d group-id %d wsi-index %u device-id %d wsi-controller %d\\n",\n'
+                r'\t\t   pdev_idx, conn_req.service_id, ab->htc.wmi_ep_count,\n'
+                r'\t\t   ab->hw_params->max_radios, ab->qmi.num_radios,\n'
+                r'\t\t   ag ? ag->id : ATH12K_INVALID_GROUP_ID, ab->wsi_info.index,\n'
+                r'\t\t   ab->device_id, wsi_controller);\n'
+            ),
+            # 3. 替换失败时的警告日志，携带完整的 WMI/WSI 拓扑参数
+            (
+                r'(\t)ath12k_warn\(ab,\s*"failed to connect to WMI CONTROL service status:\s*%d\\n",\s*status\);',
+                r'\1ath12k_warn(ab,\n'
+                r'\1\t    "failed to connect WMI control pdev %u service 0x%x: %d (endpoints %d max-radios %d qmi-radios %d group-id %d wsi-index %u device-id %d wsi-controller %d)\\n",\n'
+                r'\1\t    pdev_idx, conn_req.service_id, status,\n'
+                r'\1\t    ab->htc.wmi_ep_count, ab->hw_params->max_radios,\n'
+                r'\1\t    ab->qmi.num_radios,\n'
+                r'\1\t    ag ? ag->id : ATH12K_INVALID_GROUP_ID,\n'
+                r'\1\t    ab->wsi_info.index, ab->device_id, wsi_controller);'
+            ),
+        ],
+    },
 ]
 
 def apply_spec(content, spec, label):
