@@ -34,23 +34,16 @@ def resolve_tree_dir(tree_key):
 def find_file(base_dir, filename, path_must_contain=()):
     matches = []
     seen_real = set()
-    visited_dirs = set()
 
-    for root, dirs, files in os.walk(base_dir, followlinks=True):
-        # 记录已访问的真实路径，防止软链接环路导致的死循环
-        real_root = os.path.realpath(root)
-        if real_root in visited_dirs:
-            dirs.clear()
-            continue
-        visited_dirs.add(real_root)
-
+    # 恢复安全的 os.walk，不跟随目录软链接，防止遍历时把真实目录提前剪枝
+    for root, dirs, files in os.walk(base_dir):
         if filename in files:
             full_path = os.path.join(root, filename)
             if not all(part in full_path for part in path_must_contain):
                 continue
             real = os.path.realpath(full_path)
             if real in seen_real:
-                continue  # 同一份物理文件的另一条路径，跳过
+                continue  # 仅做文件级别的真实路径去重
             seen_real.add(real)
             matches.append(full_path)
     return matches
@@ -305,8 +298,12 @@ def main():
         combined_diff = ''
         for spec in specs:
             candidates = find_file(base_dir, spec['filename'], spec['path_must_contain'])
-            spec_matched = False
             
+            if not candidates:
+                print(f"  !! [{name}] 错误：未找到目标文件 {spec['filename']} (限定条件: {spec['path_must_contain']})")
+                continue
+
+            spec_matched = False
             for p in candidates:
                 with open(p, 'r', encoding='utf-8', errors='ignore') as f:
                     original = f.read()
@@ -321,13 +318,13 @@ def main():
                     print(f"  [{name}] 已修改: {os.path.relpath(p, base_dir)}")
 
             if not spec_matched:
-                print(f"  !! [{name}] 警告：未找到匹配的目标代码或内容未变化 ({spec['filename']})")
+                print(f"  !! [{name}] 提示：找到了文件 {spec['filename']}，但未匹配到替换内容（代码已被修改过或上下文不一致）")
 
         if combined_diff:
-            patch_dir = os.path.join(os.environ['ROOT_DIR'], TREES[tree_key]['patch_dir_rel'])
+            patch_dir = os.path.join(root_dir, TREES[tree_key]['patch_dir_rel'])
             os.makedirs(patch_dir, exist_ok=True)
             out_path = os.path.join(patch_dir, f'{name}.patch')
-            with open(out_path, 'w') as f:
+            with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(combined_diff)
             print(f"✅ 已生成 {out_path}")
 
