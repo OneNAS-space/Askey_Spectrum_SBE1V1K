@@ -31,19 +31,19 @@ def resolve_tree_dir(tree_key):
         sys.exit(1)
     return os.path.abspath(d)
 
-def find_file(base_dir, filename, path_must_contain=()):
+def find_file(base_dir, filename, path_must_contain=(), parent_dir_exact=None):
     matches = []
     seen_real = set()
-
-    # 恢复安全的 os.walk，不跟随目录软链接，防止遍历时把真实目录提前剪枝
     for root, dirs, files in os.walk(base_dir):
         if filename in files:
             full_path = os.path.join(root, filename)
             if not all(part in full_path for part in path_must_contain):
                 continue
+            if parent_dir_exact is not None and os.path.basename(root) != parent_dir_exact:
+                continue
             real = os.path.realpath(full_path)
             if real in seen_real:
-                continue  # 仅做文件级别的真实路径去重
+                continue
             seen_real.add(real)
             matches.append(full_path)
     return matches
@@ -216,6 +216,7 @@ PATCH_SPECS = [
         'name': '105-wifi-ath12k-support-CV-upload-direct-buffer-module',
         'filename': 'wmi.h',
         'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
         'kind': 'literal',
         'replacements': [
             # 仅匹配唯一标识行，不依赖后续的换行和注释
@@ -230,6 +231,7 @@ PATCH_SPECS = [
         'name': '106-wifi-ath12k-handle-empty-regulatory-events',
         'filename': 'wmi.c',
         'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
         'kind': 'regex',  # 改用正则，对 backports-7.2 代码差异免疫
         'replacements': [
             # 1. 增加 status_code 局部变量（精准捕捉 total_reg_rules 声明行）
