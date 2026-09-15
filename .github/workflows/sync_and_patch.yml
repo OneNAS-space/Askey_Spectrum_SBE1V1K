@@ -51,8 +51,8 @@ jobs:
       - name: Prepare Upstream Baseline Sources
         run: |
           cd openwrt-src
-          make target/linux/{download,prepare} QUILT=1 V=s
-          make package/kernel/mac80211/{download,prepare} QUILT=1 V=s
+          make target/linux/{download,prepare}
+          make package/kernel/mac80211/{download,prepare}
 
       - name: Debug Quilt Patch State
         run: |
