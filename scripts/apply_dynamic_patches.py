@@ -385,6 +385,29 @@ PATCH_SPECS = [
             ),
         ],
     },
+    {
+        'tree': 'mac80211',
+        'name': '110-wifi-ath12k-limit-WMI-endpoints-to-QMI-PHY-count',
+        'filename': 'htc.c',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 限制 WMI endpoint 数量不超过 QMI 广播的 PHY 数量
+            (
+                r'([ \t]*htc->wmi_ep_count\s*=\s*ab->hw_params->max_radios;\s*\n'
+                r'[ \t]*break;\s*\n'
+                r'[ \t]*\}\n)'
+                r'(\n[ \t]*/\* setup our pseudo HTC control endpoint connection \*/)',
+
+                r'\1'
+                r'\tif (ab->qmi.num_radios > 0 && ab->qmi.num_radios != U8_MAX)\n'
+                r'\t\thtc->wmi_ep_count = min_t(u8, htc->wmi_ep_count,\n'
+                r'\t\t\t\t\t  ab->qmi.num_radios);\n'
+                r'\2'
+            ),
+        ],
+    },
 ]
 
 def apply_spec(content, spec, label):
