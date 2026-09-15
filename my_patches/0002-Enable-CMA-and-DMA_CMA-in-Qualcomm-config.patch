@@ -1,0 +1,32 @@
+From b20f2958dd6fbe2bbe88c7a0e9fa132bf8ba749c Mon Sep 17 00:00:00 2001
+From: Jackie264 <jackie.han@gmail.com>
+Date: Thu, 10 Sep 2026 22:09:47 +0800
+Subject: [PATCH] Enable CMA and DMA_CMA in Qualcomm config
+
+---
+ target/linux/qualcommbe/config-6.18 | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/target/linux/qualcommbe/config-6.18 b/target/linux/qualcommbe/config-6.18
+index d5ba7d1759..5d598f93f1 100644
+--- a/target/linux/qualcommbe/config-6.18
++++ b/target/linux/qualcommbe/config-6.18
+@@ -67,6 +67,10 @@ CONFIG_CC_HAVE_STACKPROTECTOR_SYSREG=y
+ # CONFIG_CLK_X1E80100_TCSRCC is not set
+ # CONFIG_CLK_X1P42100_GPUCC is not set
+ CONFIG_CLONE_BACKWARDS=y
++CONFIG_CMA=y
++CONFIG_CMA_AREAS=8
++CONFIG_CMA_SIZE_MBYTES=256
++CONFIG_CMA_SIZE_SEL_MBYTES=y
+ CONFIG_COMMON_CLK=y
+ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_COMPACT_UNEVICTABLE_DEFAULT=1
+@@ -124,6 +128,7 @@ CONFIG_DEBUG_INFO=y
+ CONFIG_DEV_COREDUMP=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DMA_BOUNCE_UNALIGNED_KMALLOC=y
++CONFIG_DMA_CMA=y
+ CONFIG_DMA_DIRECT_REMAP=y
+ CONFIG_DMA_ENGINE=y
+ CONFIG_DMA_NEED_SYNC=y
