@@ -34,54 +34,7 @@ def make_unified_diff(kernel_dir, path, original, updated):
 # ---- 以后加新补丁，只需要在这里追加条目 ----
 PATCH_SPECS = [
     {
-        'name': 'dynamic-napi-budgets',
-        'filename': 'edma.c',
-        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
-        'kind': 'regex',
-        'replacements': [
-            (r'MODULE_PARM_DESC\(\s*edma_rx_napi_budget\s*,\s*".*?"\s*\)',
-             'MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:64, min:16, max:64)")'),
-            (r'MODULE_PARM_DESC\(\s*edma_tx_napi_budget\s*,\s*".*?"\s*\)',
-             'MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:64, min:16, max:64)")'),
-            (r'\.napi_budget_tx\s*=\s*\d+\s*,', '.napi_budget_tx = 64,'),
-        ],
-    },
-    {
-        'name': 'dynamic-napi-budgets',
-        'filename': 'edma_cfg_rx.c',
-        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
-        'kind': 'regex',
-        'replacements': [(r'(edma_rx_napi_poll,\s*)hw_info->napi_budget_rx', r'\1edma_rx_napi_budget')],
-    },
-    {
-        'name': 'dynamic-napi-budgets',
-        'filename': 'edma_cfg_rx.h',
-        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
-        'kind': 'regex',
-        'replacements': [
-            (r'#define\s+EDMA_RX_NAPI_WORK_DEF\s+\d+', '#define EDMA_RX_NAPI_WORK_DEF\t\t64'),
-            (r'#define\s+EDMA_RX_NAPI_WORK_MAX\s+\d+', '#define EDMA_RX_NAPI_WORK_MAX\t\t64'),
-        ],
-    },
-    {
-        'name': 'dynamic-napi-budgets',
-        'filename': 'edma_cfg_tx.c',
-        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
-        'kind': 'regex',
-        'replacements': [(r'(edma_tx_napi_poll,\s*)hw_info->napi_budget_tx', r'\1edma_tx_napi_budget')],
-    },
-    {
-        'name': 'dynamic-napi-budgets',
-        'filename': 'edma_cfg_tx.h',
-        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
-        'kind': 'regex',
-        'replacements': [
-            (r'#define\s+EDMA_TX_NAPI_WORK_DEF\s+\d+', '#define EDMA_TX_NAPI_WORK_DEF\t64'),
-            (r'#define\s+EDMA_TX_NAPI_WORK_MAX\s+\d+', '#define EDMA_TX_NAPI_WORK_MAX\t64'),
-        ],
-    },
-    {
-        'name': 'regulator-mp5496-supply-fix',
+        'name': '0362-regulator-qcom_smd-fix-MP5496-supply-names',
         'filename': 'qcom_smd-regulator.c',
         'path_must_contain': ('regulator',),
         'kind': 'literal',
@@ -94,6 +47,53 @@ PATCH_SPECS = [
              '{ "l2", QCOM_SMD_RPM_LDOA, 2, &mp5496_ldoa2, "vin2" },'),
             ('{ "l5", QCOM_SMD_RPM_LDOA, 5, &mp5496_ldoa2, "l5" },',
              '{ "l5", QCOM_SMD_RPM_LDOA, 5, &mp5496_ldoa2, "vin5" },'),
+        ],
+    },
+    {
+        'name': '0363-net-ethernet-qualcomm-honor-safe-NAPI-budgets',
+        'filename': 'edma.c',
+        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
+        'kind': 'regex',
+        'replacements': [
+            (r'MODULE_PARM_DESC\(\s*edma_rx_napi_budget\s*,\s*".*?"\s*\)',
+             'MODULE_PARM_DESC(edma_rx_napi_budget, "Rx NAPI budget (default:64, min:16, max:64)")'),
+            (r'MODULE_PARM_DESC\(\s*edma_tx_napi_budget\s*,\s*".*?"\s*\)',
+             'MODULE_PARM_DESC(edma_tx_napi_budget, "Tx NAPI budget (default:64, min:16, max:64)")'),
+            (r'\.napi_budget_tx\s*=\s*\d+\s*,', '.napi_budget_tx = 64,'),
+        ],
+    },
+    {
+        'name': '0363-net-ethernet-qualcomm-honor-safe-NAPI-budgets',
+        'filename': 'edma_cfg_rx.c',
+        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
+        'kind': 'regex',
+        'replacements': [(r'(edma_rx_napi_poll,\s*)hw_info->napi_budget_rx', r'\1edma_rx_napi_budget')],
+    },
+    {
+        'name': '0363-net-ethernet-qualcomm-honor-safe-NAPI-budgets',
+        'filename': 'edma_cfg_rx.h',
+        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
+        'kind': 'regex',
+        'replacements': [
+            (r'#define\s+EDMA_RX_NAPI_WORK_DEF\s+\d+', '#define EDMA_RX_NAPI_WORK_DEF\t\t64'),
+            (r'#define\s+EDMA_RX_NAPI_WORK_MAX\s+\d+', '#define EDMA_RX_NAPI_WORK_MAX\t\t64'),
+        ],
+    },
+    {
+        'name': '0363-net-ethernet-qualcomm-honor-safe-NAPI-budgets',
+        'filename': 'edma_cfg_tx.c',
+        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
+        'kind': 'regex',
+        'replacements': [(r'(edma_tx_napi_poll,\s*)hw_info->napi_budget_tx', r'\1edma_tx_napi_budget')],
+    },
+    {
+        'name': '0363-net-ethernet-qualcomm-honor-safe-NAPI-budgets',
+        'filename': 'edma_cfg_tx.h',
+        'path_must_contain': ('ethernet', 'qualcomm', 'ppe'),
+        'kind': 'regex',
+        'replacements': [
+            (r'#define\s+EDMA_TX_NAPI_WORK_DEF\s+\d+', '#define EDMA_TX_NAPI_WORK_DEF\t64'),
+            (r'#define\s+EDMA_TX_NAPI_WORK_MAX\s+\d+', '#define EDMA_TX_NAPI_WORK_MAX\t64'),
         ],
     },
 ]
@@ -141,7 +141,7 @@ def main():
                     print(f"  !! [{name}] 未找到目标文件或内容未变化: {spec['filename']}")
 
         if combined_diff:
-            out_path = os.path.join(patch_dir, f'999-{name}.patch')
+            out_path = os.path.join(patch_dir, f'{name}.patch')
             with open(out_path, 'w') as f:
                 f.write(combined_diff)
             print(f"✅ 已生成 {out_path}")
