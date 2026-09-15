@@ -38,6 +38,7 @@ jobs:
           cd openwrt-src
           patch -p1 < ../config-repo/my_patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
           patch -p1 < ../config-repo/my_patches/0002-Enable-CMA-and-DMA_CMA-in-Qualcomm-config.patch
+          patch -p1 < ../config-repo/my_patches/003-change-timezone-config_generate.patch
 
       - name: Select Target (qualcommbe / ipq95xx)
         run: |
