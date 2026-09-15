@@ -65,62 +65,14 @@ jobs:
           find build_dir -maxdepth 4 2>&1 || true
           echo "=== dl/ 缓存目录(确认内核tarball有没有下载下来) ==="
           ls -la dl/ 2>&1 | grep -i linux || echo "没找到 linux 内核 tarball"
-          
-      - name: Auto-Fix NAPI Budgets & Generate Kernel Patch
+
+      - name: Auto-Apply Dynamic Kernel Patches
         run: |
           cd openwrt-src
           export ROOT_DIR=$PWD
-          
-          # 【修复1】精确获取真正的内核源码深层目录，形如 build_dir/.../linux-qualcommbe_ipq95xx/linux-6.18.44
           export ACTUAL_KERNEL_DIR=$(ls -d build_dir/target-*/linux-*/linux-6.* | grep -v 'orig' | head -n 1)
-          echo "Exact kernel source dir: $ACTUAL_KERNEL_DIR"
-          
-          if [ -d "$ACTUAL_KERNEL_DIR" ]; then
-            KERNEL_PARENT=$(dirname "$ACTUAL_KERNEL_DIR")
-            KERNEL_BASENAME=$(basename "$ACTUAL_KERNEL_DIR")
-            
-            # 进入父目录，备份最深层的 linux-6.18.44 真实源码
-            cd "$ROOT_DIR/$KERNEL_PARENT"
-            cp -a "$KERNEL_BASENAME" "${KERNEL_BASENAME}.orig"
-            
-            # 调试辅助：打印出真实高通 edma 驱动的位置，帮你核对 Python 路径是否写错
-            echo "=== Debug: Looking for qualcomm/ppe edma files ==="
-            find "$KERNEL_BASENAME" -type f -name "edma*.c" | grep -iE "qualcomm|ppe" || echo "Warning: No edma files found for qualcomm!"
-            
-            # 回到根目录，执行 Python 脚本
-            cd "$ROOT_DIR"
-            
-            # 强制导出最深层路径给 Python 脚本
-            export KERNEL_DIR="$ROOT_DIR/$ACTUAL_KERNEL_DIR"
-            python3 ../config-repo/scripts/fix_napi_budget.py
-            
-            # 对比 linux-6.18.44.orig 和 linux-6.18.44，生成标准 OpenWrt 补丁
-            cd "$ROOT_DIR/$KERNEL_PARENT"
-            PATCH_DIR="$ROOT_DIR/target/linux/qualcommbe/patches-6.18"
-            mkdir -p "$PATCH_DIR"
-            PATCH_FILE="$PATCH_DIR/999-dynamic-napi-budgets.patch"
-            
-            diff -urN "${KERNEL_BASENAME}.orig" "$KERNEL_BASENAME" > "$PATCH_FILE" || true
-            sed -i -E "s#^--- ${KERNEL_BASENAME}\.orig/#--- a/#; s#^\+\+\+ ${KERNEL_BASENAME}/#+++ b/#" "$PATCH_FILE"
-            
-            # 清理备份的庞大内核文件夹
-            rm -rf "${KERNEL_BASENAME}.orig"
-            
-            # 【修复2】严格检查补丁是否为空
-            if [ ! -s "$PATCH_FILE" ]; then
-              echo "❌ 错误: 生成的补丁是 0 字节！这意味着 Python 没有修改任何代码。"
-              echo ">> 请立即检查 config-repo/scripts/fix_napi_budget.py："
-              echo "1. subpath_hint 路径限制是否太严格？(建议把 'qualcomm/ppe' 放宽为 'qualcomm')"
-              echo "2. .replace() 里的字符串空格、符号是否和原版源码存在细微差异？"
-              exit 1
-            fi
-            
-            echo "✅ 动态补丁生成成功！"
-            cat "$PATCH_FILE" | head -n 20
-          else
-            echo "Error: Actual kernel directory not found."
-            exit 1
-          fi
+          export KERNEL_DIR="$ROOT_DIR/$ACTUAL_KERNEL_DIR"
+          python3 ../config-repo/scripts/apply_dynamic_patches.py
 
       - name: Commit and Push to Branch
         env:
