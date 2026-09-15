@@ -305,7 +305,7 @@ PATCH_SPECS = [
                 r'\1'
             ),
         ],
-    }
+    },
     {
         'tree': 'mac80211',
         'name': '108-wifi-ath12k-use-WSI-index-for-hardware-group-order',
@@ -345,7 +345,7 @@ PATCH_SPECS = [
                 r'\1\t   ag->id, ag->num_devices, wsi->index, ab->device_id);'
             ),
         ],
-    }
+    },
 ]
 
 def apply_spec(content, spec, label):
