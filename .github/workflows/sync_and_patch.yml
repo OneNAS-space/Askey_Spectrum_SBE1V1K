@@ -37,8 +37,7 @@ jobs:
         run: |
           cd openwrt-src
           patch -p1 < ../config-repo/my_patches/0001-dts-add-bootargs-CMA-configured-reserved-men-settings.patch
-          # mkdir -p target/linux/qualcommbe/patches-6.18/
-          # cp ../config-repo/patches/target/linux/qualcommbe/patches-6.18/* target/linux/qualcommbe/patches-6.18/
+          patch -p1 < ../config-repo/my_patches/0002-Enable-CMA-and-DMA_CMA-in-Qualcomm-config.patch
 
       - name: Select Target (qualcommbe / ipq95xx)
         run: |
