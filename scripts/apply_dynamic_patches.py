@@ -342,6 +342,10 @@ def main():
         combined_diff = ''
         for spec in specs:
             candidates = find_file(base_dir, spec['filename'], spec['path_must_contain'])
+            if len(candidates) > 1:
+                print(f"  !! [{name}] 警告：{spec['filename']} 找到 {len(candidates)} 个候选，可能存在残留副本：")
+                for c in candidates:
+                    print(f"       - {c}")
             
             if not candidates:
                 print(f"  !! [{name}] 错误：未找到目标文件 {spec['filename']} (限定条件: {spec['path_must_contain']})")
