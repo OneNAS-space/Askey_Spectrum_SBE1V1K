@@ -49,7 +49,11 @@ def main():
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
         original = content
-        content = content.replace('hw_info->napi_budget_rx', 'edma_rx_napi_budget')
+        content = re.sub(
+            r'(edma_rx_napi_poll,\s*)hw_info->napi_budget_rx',
+            r'\1edma_rx_napi_budget',
+            content
+        )
         if content != original:
             with open(p, 'w', encoding='utf-8') as f: f.write(content)
             patched_files_count += 1
@@ -70,7 +74,11 @@ def main():
         print(f'Patching {p}...')
         with open(p, 'r', encoding='utf-8', errors='ignore') as f: content = f.read()
         original = content
-        content = content.replace('hw_info->napi_budget_tx', 'edma_tx_napi_budget')
+        content = re.sub(
+            r'(edma_tx_napi_poll,\s*)hw_info->napi_budget_tx',
+            r'\1edma_tx_napi_budget',
+            content
+        )
         if content != original:
             with open(p, 'w', encoding='utf-8') as f: f.write(content)
             patched_files_count += 1
