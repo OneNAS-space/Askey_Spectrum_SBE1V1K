@@ -466,7 +466,7 @@ PATCH_SPECS = [
             # 3. 中断初始化处使用 tasklet_setup 替换 INIT_WORK
             (
                 r'[ \t]*INIT_WORK\(&ce_pipe->intr_wq,\s*ath12k_pci_ce_workqueue\);',
-                r'\ttasklet_setup(&ce_pipe->intr_tq, ath12k_pci_ce_tasklet);'
+                r'\t\ttasklet_setup(&ce_pipe->intr_tq, ath12k_pci_ce_tasklet);'
             ),
             # 4. 函数名还原：ath12k_pci_cancel_workqueue -> ath12k_pci_kill_tasklets
             (
@@ -476,7 +476,7 @@ PATCH_SPECS = [
             # 5. 清理函数中使用 tasklet_kill 替换 cancel_work_sync
             (
                 r'[ \t]*cancel_work_sync\(&ce_pipe->intr_wq\);',
-                r'\ttasklet_kill(&ce_pipe->intr_tq);'
+                r'\t\ttasklet_kill(&ce_pipe->intr_tq);'
             ),
             # 6. 还原同步禁用中断函数中的调用点
             (
