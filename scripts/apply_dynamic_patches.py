@@ -16,10 +16,16 @@ TREES = {
 def resolve_tree_dir(tree_key):
     env_name = TREES[tree_key]['dir_env']
     d = os.environ.get(env_name)
-    if not d and tree_key == 'kernel':
-        matches = glob.glob('build_dir/target-*/linux-*')
-        if matches:
-            d = matches[0]
+    if not d:
+        if tree_key == 'kernel':
+            matches = glob.glob('build_dir/target-*/linux-*')
+            if matches:
+                d = matches[0]
+        elif tree_key == 'mac80211':
+            matches = glob.glob('build_dir/target-*/mac80211-*') or glob.glob('build_dir/target-*/backports-*')
+            if matches:
+                d = matches[0]
+
     if not d or not os.path.isdir(d):
         print(f"Error: {env_name} 未设置或目录不存在: {d}")
         sys.exit(1)
@@ -28,7 +34,16 @@ def resolve_tree_dir(tree_key):
 def find_file(base_dir, filename, path_must_contain=()):
     matches = []
     seen_real = set()
+    visited_dirs = set()
+
     for root, dirs, files in os.walk(base_dir, followlinks=True):
+        # 记录已访问的真实路径，防止软链接环路导致的死循环
+        real_root = os.path.realpath(root)
+        if real_root in visited_dirs:
+            dirs.clear()
+            continue
+        visited_dirs.add(real_root)
+
         if filename in files:
             full_path = os.path.join(root, filename)
             if not all(part in full_path for part in path_must_contain):
@@ -40,15 +55,45 @@ def find_file(base_dir, filename, path_must_contain=()):
             matches.append(full_path)
     return matches
 
+def format_diff_range(start, stop):
+    length = stop - start
+    if length == 1:
+        return f"{start + 1}"
+    if length == 0:
+        return f"{start},0"  # 纯插入时取插入位置前一行的行号
+    return f"{start + 1},{length}"
+
 def make_unified_diff(base_dir, path, original, updated):
     relpath = os.path.relpath(path, base_dir)
-    diff = difflib.unified_diff(
-        original.splitlines(keepends=True),
-        updated.splitlines(keepends=True),
-        fromfile=f'a/{relpath}',
-        tofile=f'b/{relpath}',
-    )
-    return ''.join(diff)
+    a = original.splitlines(keepends=True)
+    b = updated.splitlines(keepends=True)
+
+    # 禁用 autojunk=False，防止高频出现的 \t} 和空行被忽略导致 diff 上下文错位
+    matcher = difflib.SequenceMatcher(None, a, b, autojunk=False)
+
+    lines = [
+        f'--- a/{relpath}\n',
+        f'+++ b/{relpath}\n'
+    ]
+
+    for group in matcher.get_grouped_opcodes(n=3):
+        first, last = group[0], group[-1]
+        file1_range = format_diff_range(first[1], last[2])
+        file2_range = format_diff_range(first[3], last[4])
+        lines.append(f'@@ -{file1_range} +{file2_range} @@\n')
+
+        for tag, i1, i2, j1, j2 in group:
+            if tag == 'equal':
+                for line in a[i1:i2]:
+                    lines.append(' ' + line)
+            elif tag in ('replace', 'delete'):
+                for line in a[i1:i2]:
+                    lines.append('-' + line)
+            if tag in ('replace', 'insert'):
+                for line in b[j1:j2]:
+                    lines.append('+' + line)
+
+    return ''.join(lines)
 
 # ---- 以后加新补丁，只需要在这里追加条目 ----
 # 'tree' 不写默认是 'kernel'（原有条目全部保持不变，不用补这个字段）
@@ -249,6 +294,7 @@ def main():
 
     tree_dirs = {}
     total_patched = 0
+    root_dir = os.environ.get('ROOT_DIR', '.')
 
     for (tree_key, name), specs in grouped.items():
         if tree_key not in tree_dirs:
