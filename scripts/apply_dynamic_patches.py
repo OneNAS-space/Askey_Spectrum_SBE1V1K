@@ -96,6 +96,24 @@ PATCH_SPECS = [
             (r'#define\s+EDMA_TX_NAPI_WORK_MAX\s+\d+', '#define EDMA_TX_NAPI_WORK_MAX\t64'),
         ],
     },
+    {
+        'name': '0404-arm64-dts-qcom-ipq9574-add-sdhci-reset',
+        'filename': 'ipq9574.dtsi',
+        'path_must_contain': ('arch', 'arm64', 'boot', 'dts', 'qcom'),
+        'kind': 'literal',
+        'replacements': [
+            (
+                '\t\t\t <&gcc GCC_SDCC1_ICE_CORE_CLK>;\n'
+                '\t\t\tclock-names = "iface", "core", "xo", "ice";\n'
+                '\t\t\tnon-removable;',
+
+                '\t\t\t <&gcc GCC_SDCC1_ICE_CORE_CLK>;\n'
+                '\t\t\tclock-names = "iface", "core", "xo", "ice";\n'
+                '\t\t\tresets = <&gcc GCC_SDCC_BCR>;\n'
+                '\t\t\tnon-removable;'
+            ),
+        ],
+    },
 ]
 
 def apply_spec(content, spec, label):
