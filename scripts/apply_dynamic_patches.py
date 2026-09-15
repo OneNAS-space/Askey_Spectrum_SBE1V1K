@@ -58,10 +58,48 @@ def format_diff_range(start, stop):
 
 def make_unified_diff(base_dir, path, original, updated):
     relpath = os.path.relpath(path, base_dir)
+    
+    # ---- 优先使用系统的 git diff --no-index 或 diff -u 生成 Linux 内核级别的规范补丁 ----
+    f1_path, f2_path = None, None
+    try:
+        with tempfile.NamedTemporaryFile('w', delete=False, encoding='utf-8') as f1, \
+             tempfile.NamedTemporaryFile('w', delete=False, encoding='utf-8') as f2:
+            f1.write(original)
+            f2.write(updated)
+            f1_path, f2_path = f1.name, f2.name
+
+        # 1. 尝试 git diff --no-index (带缩进启发算法，不会错位大括号)
+        cmd = ['git', 'diff', '--no-index', '-u', f1_path, f2_path]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.stdout:
+            lines = res.stdout.splitlines(keepends=True)
+            out = [f'--- a/{relpath}\n', f'+++ b/{relpath}\n']
+            for line in lines:
+                if line.startswith('--- ') or line.startswith('+++ ') or line.startswith('diff --git') or line.startswith('index '):
+                    continue
+                out.append(line)
+            return ''.join(out)
+
+        # 2. 尝试系统 diff -u
+        cmd = ['diff', '-u', f1_path, f2_path]
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.stdout:
+            lines = res.stdout.splitlines(keepends=True)
+            out = [f'--- a/{relpath}\n', f'+++ b/{relpath}\n']
+            for line in lines[2:]:
+                out.append(line)
+            return ''.join(out)
+    except Exception:
+        pass
+    finally:
+        if f1_path and os.path.exists(f1_path):
+            os.remove(f1_path)
+        if f2_path and os.path.exists(f2_path):
+            os.remove(f2_path)
+
+    # ---- 3. Python pure difflib 兜底 ----
     a = original.splitlines(keepends=True)
     b = updated.splitlines(keepends=True)
-
-    # 禁用 autojunk=False，防止高频出现的 \t} 和空行被忽略导致 diff 上下文错位
     matcher = difflib.SequenceMatcher(None, a, b, autojunk=False)
 
     lines = [
