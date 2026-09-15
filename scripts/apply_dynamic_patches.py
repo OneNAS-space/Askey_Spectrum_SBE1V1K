@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, re, glob, difflib
+import os, sys, re, glob, difflib, tempfile, subprocess
 
 # ---- 多棵源码树的定义：env var 提供实际目录 + 补丁最终落地的相对路径 ----
 TREES = {
