@@ -54,18 +54,6 @@ jobs:
           make target/linux/{download,prepare}
           make package/kernel/mac80211/{download,prepare}
 
-      - name: Debug Quilt Patch State
-        run: |
-          cd openwrt-src
-          echo "=== pwd ==="
-          pwd
-          echo "=== build_dir 是否存在 ==="
-          ls -la build_dir/ 2>&1 || echo "build_dir 根本不存在"
-          echo "=== build_dir 下的完整层级(如果有的话) ==="
-          find build_dir -maxdepth 4 2>&1 || true
-          echo "=== dl/ 缓存目录(确认内核tarball有没有下载下来) ==="
-          ls -la dl/ 2>&1 | grep -i linux || echo "没找到 linux 内核 tarball"
-
       - name: Auto-Apply Dynamic Kernel Patches
         run: |
           cd openwrt-src
