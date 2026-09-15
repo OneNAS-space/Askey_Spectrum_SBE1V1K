@@ -16,6 +16,7 @@ def main():
         sys.exit(1)
 
     print(f"Targeting kernel directory: {kernel_dir}")
+    patched_files_count = 0
 
     def find_file(filename):
         matches = []
