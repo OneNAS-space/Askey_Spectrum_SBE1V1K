@@ -101,6 +101,7 @@ jobs:
             PATCH_FILE="$PATCH_DIR/999-dynamic-napi-budgets.patch"
             
             diff -urN "${KERNEL_BASENAME}.orig" "$KERNEL_BASENAME" > "$PATCH_FILE" || true
+            sed -i -E "s#^--- ${KERNEL_BASENAME}\.orig/#--- a/#; s#^\+\+\+ ${KERNEL_BASENAME}/#+++ b/#" "$PATCH_FILE"
             
             # 清理备份的庞大内核文件夹
             rm -rf "${KERNEL_BASENAME}.orig"
