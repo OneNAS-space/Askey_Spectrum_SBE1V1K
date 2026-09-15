@@ -352,7 +352,7 @@ def main():
                 with open(p, 'r', encoding='utf-8', errors='ignore') as f:
                     original = f.read()
                 
-                content, applied_count = apply_spec(original, spec)
+                content, applied_count = apply_spec(original, spec, name)
                 if content != original:
                     spec_matched = True
                     with open(p, 'w', encoding='utf-8') as f:
