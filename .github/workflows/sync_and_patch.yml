@@ -72,6 +72,7 @@ jobs:
           export ROOT_DIR=$PWD
           export ACTUAL_KERNEL_DIR=$(ls -d build_dir/target-*/linux-*/linux-6.* | grep -v 'orig' | head -n 1)
           export KERNEL_DIR="$ROOT_DIR/$ACTUAL_KERNEL_DIR"
+          export MAC80211_DIR="$ROOT_DIR/$(ls -d build_dir/target-*/linux-*/mac80211-regular/backports-* | head -n 1)"
           python3 ../config-repo/scripts/apply_dynamic_patches.py
 
       - name: Commit and Push to Branch
