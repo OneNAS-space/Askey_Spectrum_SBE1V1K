@@ -306,6 +306,46 @@ PATCH_SPECS = [
             ),
         ],
     }
+    {
+        'tree': 'mac80211',
+        'name': '108-wifi-ath12k-use-WSI-index-for-hardware-group-order',
+        'filename': 'core.c',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 1. 替换 ab->device_id 的赋值逻辑，增加安全校验和排壳逻辑
+            (
+                r'(\t)ab->device_id\s*=\s*ag->num_probed\+\+;\n'
+                r'(\t)ag->ab\[ab->device_id\]\s*=\s*ab;\n'
+                r'(\t)ab->ag\s*=\s*ag;',
+
+                r'\1if (wsi->index >= ag->num_devices) {\n'
+                r'\1\tath12k_warn(ab, "invalid WSI index %u for group with %d devices\\n",\n'
+                r'\1\t\t    wsi->index, ag->num_devices);\n'
+                r'\1\tgoto invalid_group;\n'
+                r'\1}\n\n'
+                r'\1if (ag->ab[wsi->index]) {\n'
+                r'\1\tath12k_warn(ab, "duplicate WSI index %u in group %d\\n",\n'
+                r'\1\t\t    wsi->index, ag->id);\n'
+                r'\1\tgoto invalid_group;\n'
+                r'\1}\n\n'
+                r'\1ab->device_id = wsi->index;\n'
+                r'\2ag->ab[ab->device_id] = ab;\n'
+                r'\3ag->num_probed++;\n'
+                r'\3ab->ag = ag;'
+            ),
+            # 2. 替换底部的 ath12k_dbg 打印信息 (增加了 device_id 打印，并在末尾加上 \n)
+            (
+                r'(\t)ath12k_dbg\(ab,\s*ATH12K_DBG_BOOT,\s*"wsi group-id %d num-devices %d index %d",\n'
+                r'\t\t\s*ag->id,\s*ag->num_devices,\s*wsi->index\);',
+
+                r'\1ath12k_dbg(ab, ATH12K_DBG_BOOT,\n'
+                r'\1\t   "wsi group-id %d num-devices %d index %d device-id %d\\n",\n'
+                r'\1\t   ag->id, ag->num_devices, wsi->index, ab->device_id);'
+            ),
+        ],
+    }
 ]
 
 def apply_spec(content, spec, label):
