@@ -408,6 +408,172 @@ PATCH_SPECS = [
             ),
         ],
     },
+    {
+        'tree': 'mac80211',
+        'name': '111-wifi-ath12k-support-Wi-Fi-radar-direct-buffer-module',
+        'filename': 'wmi.h',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 在 enum wmi_direct_buffer_module 中添加 WMI_CONFIG_MODULE_WIFI_RADAR 枚举值
+            (
+                r'([ \t]*WMI_DIRECT_BUF_CV_UPLOAD\s*=\s*2,?\n)',
+                r'\1\tWMI_CONFIG_MODULE_WIFI_RADAR = 3,\n'
+            ),
+        ],
+    },
+    # 200 - 修改 ce.h 部分
+    {
+        'tree': 'mac80211',
+        'name': '200-Revert-wifi-ath12k-convert-tasklet-to-BH-workqueue-f',
+        'filename': 'ce.h',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 还原结构体 ath12k_ce_pipe 中的 intr_tq 字段
+            (
+                r'([ \t]*)struct work_struct intr_wq;',
+                r'\1struct tasklet_struct intr_tq;'
+            ),
+        ],
+    },
+    # 200 - 修改 pci.c 部分
+    {
+        'tree': 'mac80211',
+        'name': '200-Revert-wifi-ath12k-convert-tasklet-to-BH-workqueue-f',
+        'filename': 'pci.c',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 1. 还原 tasklet 处理函数声明及 from_tasklet 转换
+            (
+                r'static void ath12k_pci_ce_workqueue\(struct work_struct \*work\)\n'
+                r'\{\n'
+                r'[ \t]*struct ath12k_ce_pipe \*ce_pipe = from_work\(ce_pipe, work, intr_wq\);',
+
+                r'static void ath12k_pci_ce_tasklet(struct tasklet_struct *t)\n'
+                r'{\n'
+                r'\tstruct ath12k_ce_pipe *ce_pipe = from_tasklet(ce_pipe, t, intr_tq);'
+            ),
+            # 2. 中断处理函数中调度 tasklet 替换队列进队
+            (
+                r'[ \t]*queue_work\(system_bh_wq,\s*&ce_pipe->intr_wq\);',
+                r'\ttasklet_schedule(&ce_pipe->intr_tq);'
+            ),
+            # 3. 中断初始化处使用 tasklet_setup 替换 INIT_WORK
+            (
+                r'[ \t]*INIT_WORK\(&ce_pipe->intr_wq,\s*ath12k_pci_ce_workqueue\);',
+                r'\ttasklet_setup(&ce_pipe->intr_tq, ath12k_pci_ce_tasklet);'
+            ),
+            # 4. 函数名还原：ath12k_pci_cancel_workqueue -> ath12k_pci_kill_tasklets
+            (
+                r'static void ath12k_pci_cancel_workqueue\(struct ath12k_base \*ab\)',
+                r'static void ath12k_pci_kill_tasklets(struct ath12k_base *ab)'
+            ),
+            # 5. 清理函数中使用 tasklet_kill 替换 cancel_work_sync
+            (
+                r'[ \t]*cancel_work_sync\(&ce_pipe->intr_wq\);',
+                r'\ttasklet_kill(&ce_pipe->intr_tq);'
+            ),
+            # 6. 还原同步禁用中断函数中的调用点
+            (
+                r'([ \t]*)ath12k_pci_cancel_workqueue\(ab\);',
+                r'\1ath12k_pci_kill_tasklets(ab);'
+            ),
+        ],
+    },
+    {
+        'tree': 'mac80211',
+        'name': '400-wifi-ath12k-set-per-radio-MAC-address-from-DT',
+        'filename': 'mac.c',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 1. 头文件引用区引入 <linux/of_net.h>
+            (
+                r'(#include <linux/etherdevice\.h>\n)',
+                r'\1#include <linux/of_net.h>\n'
+            ),
+            # 2. 在 ath12k_mac_setup_iface_combinations 中添加 struct mac_address *addresses;
+            (
+                r'([ \t]*struct wiphy_radio \*radio;\n)',
+                r'\1\tstruct mac_address *addresses;\n'
+            ),
+            # 3. 增加 addresses 内存分配，并更新 radio 分配失败后的 goto 异常跳转标签
+            (
+                r'([ \t]*/\* there are multiple radios \*/\n\n)'
+                r'([ \t]*radio = [^;\n]+;\n'
+                r'[ \t]*if \(!radio\) \{\n'
+                r'[ \t]*ret = -ENOMEM;\n)'
+                r'[ \t]*goto err_free_combinations;',
+
+                r'\1\taddresses = kcalloc(ah->num_radio, sizeof(*addresses), GFP_KERNEL);\n'
+                r'\tif (!addresses) {\n'
+                r'\t\tret = -ENOMEM;\n'
+                r'\t\tgoto err_free_combinations;\n'
+                r'\t}\n\n'
+                r'\2\n\t\tgoto err_free_addresses;'
+            ),
+            # 4. 在 for_each_ar 循环末尾复制 MAC 地址到 addresses 数组
+            (
+                r'([ \t]*radio\[i\]\.n_iface_combinations = 1;\n)',
+                r'\1\n\t\tether_addr_copy(addresses[i].addr, ar->mac_addr);\n'
+            ),
+            # 5. 设置 wiphy 结构体的 addresses 和 n_addresses 成员
+            (
+                r'([ \t]*wiphy->n_radio = ah->num_radio;\n)',
+                r'\1\n\twiphy->addresses = addresses;\n\twiphy->n_addresses = ah->num_radio;\n'
+            ),
+            # 6. 在错误清理节点中追加 kfree(addresses)
+            (
+                r'(err_free_radios:\s*\n[ \t]*kfree\(radio\);\n)',
+                r'\1\nerr_free_addresses:\n\tkfree(addresses);\n'
+            ),
+            # 7. 在 ath12k_mac_hw_register 中为单 Radio 设备从 DT 读取 MAC 地址
+            (
+                r'([ \t]*ar->mac_addr\[4\] \+= ar->pdev_idx;\n'
+                r'[ \t]*\}\n)',
+
+                r'\1\n'
+                r'\t\t/*\n'
+                r'\t\t * In the ath12k-wsi binding each radio is its own device\n'
+                r'\t\t * node, so a DT "mac-address" (e.g. an nvmem cell) on the\n'
+                r'\t\t * node is this radio\'s. A chip backing several radios shares\n'
+                r'\t\t * one node and can\'t express a per-radio address, so read DT\n'
+                r'\t\t * only for single-radio chips; the rest keep the address\n'
+                r'\t\t * derived above.\n'
+                r'\t\t */\n'
+                r'\t\tif (ar->ab->num_radios == 1)\n'
+                r'\t\t\tof_get_mac_address(dev_of_node(ar->ab->dev), ar->mac_addr);\n'
+            ),
+            # 8. 移除多 Radio 场景下对全局 ab->mac_addr 的覆盖设置
+            (
+                r'([ \t]*if \(i == 0\)\n[ \t]*mac_addr = ar->mac_addr;\n)'
+                r'[ \t]*else\n[ \t]*mac_addr = ab->mac_addr;\n',
+
+                r'\1'
+            ),
+        ],
+    },
+    {
+        'tree': 'mac80211',
+        'name': '701-ath12k-support-memory-type-10',
+        'filename': 'qmi.c',
+        'path_must_contain': ('mac80211', 'backports', 'drivers/net/wireless/ath/ath12k'),
+        'parent_dir_exact': 'ath12k',
+        'kind': 'regex',
+        'replacements': [
+            # 在 QMI 内存分配 switch-case 中追加对 10 号内存区域类型的支持
+            (
+                r'([ \t]*)case LPASS_SHARED_V01_REGION_TYPE:\n',
+                r'\1case LPASS_SHARED_V01_REGION_TYPE:\n\1case 10:\n'
+            ),
+        ],
+    },
 ]
 
 def apply_spec(content, spec, label):
