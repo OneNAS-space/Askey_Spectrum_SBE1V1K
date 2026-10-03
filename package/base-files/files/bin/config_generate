@@ -313,12 +313,14 @@ generate_static_system() {
 	uci -q batch <<-EOF
 		delete system.@system[0]
 		add system system
-		set system.@system[-1].hostname='OpenWrt'
-		set system.@system[-1].timezone='GMT0'
-		set system.@system[-1].zonename='UTC'
+		set system.@system[-1].hostname='SBE1V1K'
+		set system.@system[-1].timezone='HKT-8'
+		set system.@system[-1].zonename='Asia/Hong_Kong'
 		set system.@system[-1].ttylogin='0'
 		set system.@system[-1].log_size='128'
 		set system.@system[-1].urandom_seed='0'
+		set system.@system[-1].clock_timestyle='1'
+		set system.@system[-1].clock_hourcycle='h23'
 
 		delete system.ntp
 		set system.ntp='timeserver'

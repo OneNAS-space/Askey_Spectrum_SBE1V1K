@@ -1,0 +1,12 @@
+--- a/drivers/net/wireless/ath/ath12k/htc.c
++++ b/drivers/net/wireless/ath/ath12k/htc.c
+@@ -776,6 +776,9 @@ int ath12k_htc_init(struct ath12k_base *ab)
+ 		htc->wmi_ep_count = ab->hw_params->max_radios;
+ 		break;
+ 	}
++	if (ab->qmi.num_radios > 0 && ab->qmi.num_radios != U8_MAX)
++		htc->wmi_ep_count = min_t(u8, htc->wmi_ep_count,
++					  ab->qmi.num_radios);
+ 
+ 	/* setup our pseudo HTC control endpoint connection */
+ 	conn_req.ep_ops.ep_tx_complete = ath12k_htc_control_tx_complete;
