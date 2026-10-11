@@ -1,0 +1,10 @@
+--- a/drivers/net/wireless/ath/ath12k/qmi.c
++++ b/drivers/net/wireless/ath/ath12k/qmi.c
+@@ -2651,6 +2651,7 @@ static int ath12k_qmi_alloc_target_mem_chunk(struct ath12k_base *ab)
+ 		case PAGEABLE_MEM_REGION_TYPE:
+ 		case CALDB_MEM_REGION_TYPE:
+ 		case LPASS_SHARED_V01_REGION_TYPE:
++		case 10:
+ 			ret = ath12k_qmi_alloc_chunk(ab, chunk);
+ 			if (ret)
+ 				goto err;

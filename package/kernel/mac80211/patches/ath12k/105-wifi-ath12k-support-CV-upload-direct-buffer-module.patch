@@ -1,0 +1,10 @@
+--- a/drivers/net/wireless/ath/ath12k/wmi.h
++++ b/drivers/net/wireless/ath/ath12k/wmi.h
+@@ -2370,6 +2370,7 @@ enum wmi_beacon_gen_mode {
+ enum wmi_direct_buffer_module {
+ 	WMI_DIRECT_BUF_SPECTRAL = 0,
+ 	WMI_DIRECT_BUF_CFR = 1,
++	WMI_DIRECT_BUF_CV_UPLOAD = 2,
+ 
+ 	/* keep it last */
+ 	WMI_DIRECT_BUF_MAX
