@@ -1,0 +1,21 @@
+--- a/drivers/net/ethernet/qualcomm/ppe/ppe_port.c
++++ b/drivers/net/ethernet/qualcomm/ppe/ppe_port.c
+@@ -1117,7 +1117,9 @@ int ppe_port_phylink_setup(struct ppe_port *ppe_port, struct net_device *netdev)
+ 	if (IS_ERR(ppe_port->pcs)) {
+ 		dev_err(ppe_dev->dev, "PPE port %d failed to create PCS\n",
+ 			ppe_port->port_id);
+-		return PTR_ERR(ppe_port->pcs);
++		ret = PTR_ERR(ppe_port->pcs);
++		ppe_port->pcs = NULL;
++		return ret;
+ 	}
+ 
+ 	/* Port phylink capability */
+@@ -1140,6 +1142,7 @@ int ppe_port_phylink_setup(struct ppe_port *ppe_port, struct net_device *netdev)
+ 		dev_err(ppe_dev->dev, "PPE port %d failed to create phylink\n",
+ 			ppe_port->port_id);
+ 		ret = PTR_ERR(ppe_port->phylink);
++		ppe_port->phylink = NULL;
+ 		goto err_free_pcs;
+ 	}
+ 

@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jackie Han <jackie.han@gmail.com>
+Date: Sun, 11 Oct 2026 07:50:00 +0800
+Subject: [PATCH] net: ethernet: qualcomm: ppe: defer phylink setup to after netdev registration
+
+Defer phylink setup and PHY attachment to after netdev registration
+in edma_port_setup(). This prevents the (uninitialized) netdev status
+warning logs from printing during the driver probe stage.
+
+Signed-off-by: Jackie Han <jackie.han@gmail.com>
+
+--- a/drivers/net/ethernet/qualcomm/ppe/edma_port.c
++++ b/drivers/net/ethernet/qualcomm/ppe/edma_port.c
+@@ -422,26 +422,26 @@ int edma_port_setup(struct ppe_port *port)
+ 
+ 	edma_port_configure(netdev);
+ 
+-	ret = ppe_port_phylink_setup(port, netdev);
++	ret = register_netdev(netdev);
+ 	if (ret) {
+-		netdev_dbg(netdev, "EDMA port phylink setup for netdevice %s\n",
++		netdev_dbg(netdev, "Error registering netdevice %s\n",
+ 			   netdev->name);
+-		goto port_phylink_setup_fail;
++		goto register_netdev_fail;
+ 	}
+ 
+-	ret = register_netdev(netdev);
++	ret = ppe_port_phylink_setup(port, netdev);
+ 	if (ret) {
+-		netdev_dbg(netdev, "Error registering netdevice %s\n",
++		netdev_dbg(netdev, "EDMA port phylink setup for netdevice %s\n",
+ 			   netdev->name);
+-		goto register_netdev_fail;
++		goto port_phylink_setup_fail;
+ 	}
+ 
+ 	netdev_dbg(netdev, "Setup EDMA port%d done\n", port_id);
+ 	return ret;
+ 
+-register_netdev_fail:
+-	ppe_port_phylink_destroy(port);
+ port_phylink_setup_fail:
++	unregister_netdev(netdev);
++register_netdev_fail:
+ 	edma_port_deconfigure(netdev);
+ 	edma_ctx->netdev_arr[port_id - 1] = NULL;
+ 	edma_port_stats_free(netdev);

@@ -1,0 +1,42 @@
+--- a/drivers/net/ethernet/qualcomm/ppe/edma_ethtool.c
++++ b/drivers/net/ethernet/qualcomm/ppe/edma_ethtool.c
+@@ -203,6 +203,9 @@ static int edma_get_link_ksettings(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return -EINVAL;
+ 
++	if (!port->phylink)
++		return -EOPNOTSUPP;
++
+ 	return phylink_ethtool_ksettings_get(port->phylink, cmd);
+ }
+ 
+@@ -215,6 +218,9 @@ static int edma_set_link_ksettings(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return -EINVAL;
+ 
++	if (!port->phylink)
++		return -EOPNOTSUPP;
++
+ 	return phylink_ethtool_ksettings_set(port->phylink, cmd);
+ }
+ 
+@@ -227,7 +233,8 @@ static void edma_get_pauseparam(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return;
+ 
+-	phylink_ethtool_get_pauseparam(port->phylink, pause);
++	if (port->phylink)
++		phylink_ethtool_get_pauseparam(port->phylink, pause);
+ }
+ 
+ static int edma_set_pauseparam(struct net_device *netdev,
+@@ -239,6 +246,9 @@ static int edma_set_pauseparam(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return -EINVAL;
+ 
++	if (!port->phylink)
++		return -EOPNOTSUPP;
++
+ 	return phylink_ethtool_set_pauseparam(port->phylink, pause);
+ }
+ 
