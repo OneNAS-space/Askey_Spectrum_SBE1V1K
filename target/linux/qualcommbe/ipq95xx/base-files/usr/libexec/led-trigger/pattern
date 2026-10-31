@@ -1,0 +1,6 @@
+# Sourced by /etc/init.d/led (load_led) for "option trigger 'pattern'".
+# The stock script has no pattern case, so drive the sysfs files here.
+#   option pattern '<brightness> <ms> [<brightness> <ms> ...]'
+config_get pattern "$1" pattern
+echo pattern > "/sys/class/leds/${sysfs}/trigger"
+echo "$pattern" > "/sys/class/leds/${sysfs}/pattern"

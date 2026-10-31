@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jackie Han <jackie.han@gmail.com>
+Date: Mon, 12 Oct 2026 10:30:00 +0800
+Subject: [PATCH] net: ethernet: qualcomm: ppe: guard ethtool callbacks against missing phylink
+
+Since phylink is now set up after register_netdev() in
+edma_port_setup(), ppe_port->phylink is still NULL for a short time
+after the netdev becomes visible.  The ethtool callbacks for link
+settings and pause parameters pass it to phylink without checking, and
+would dereference a NULL pointer if called in that window.
+
+Return -EOPNOTSUPP from the callbacks that return a value, and skip the
+call in edma_get_pauseparam(), when phylink is not available.  This
+matches edma_port_open(), edma_port_close() and edma_port_ioctl(),
+which already check ppe_port->phylink.
+
+Signed-off-by: Jackie Han <jackie.han@gmail.com>
+
+--- a/drivers/net/ethernet/qualcomm/ppe/edma_ethtool.c
++++ b/drivers/net/ethernet/qualcomm/ppe/edma_ethtool.c
+@@ -203,6 +203,9 @@ static int edma_get_link_ksettings(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return -EINVAL;
+ 
++	if (!port->phylink)
++		return -EOPNOTSUPP;
++
+ 	return phylink_ethtool_ksettings_get(port->phylink, cmd);
+ }
+ 
+@@ -215,6 +218,9 @@ static int edma_set_link_ksettings(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return -EINVAL;
+ 
++	if (!port->phylink)
++		return -EOPNOTSUPP;
++
+ 	return phylink_ethtool_ksettings_set(port->phylink, cmd);
+ }
+ 
+@@ -227,7 +233,8 @@ static void edma_get_pauseparam(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return;
+ 
+-	phylink_ethtool_get_pauseparam(port->phylink, pause);
++	if (port->phylink)
++		phylink_ethtool_get_pauseparam(port->phylink, pause);
+ }
+ 
+ static int edma_set_pauseparam(struct net_device *netdev,
+@@ -239,6 +246,9 @@ static int edma_set_pauseparam(struct net_device *netdev,
+ 	if (!port_priv)
+ 		return -EINVAL;
+ 
++	if (!port->phylink)
++		return -EOPNOTSUPP;
++
+ 	return phylink_ethtool_set_pauseparam(port->phylink, pause);
+ }
+ 
