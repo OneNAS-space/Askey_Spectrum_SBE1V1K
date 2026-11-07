@@ -25,12 +25,24 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+		bootargs = "cma=256M";
 	};
 
 	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
 		tzapp:tzapp@49B00000 {
 			no-map;
 			reg = <0x0 0x49B00000 0x0 0x00600000>;
+		};
+
+		linux,cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x0 0x10000000>; /* 256MB = 0x10000000 */
+			linux,cma-default;
 		};
 	};
 
@@ -228,6 +240,9 @@
 	pinctrl-0 = <&sdc_default_state>;
 	pinctrl-names = "default";
 	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
 
 	card@0 {
 		compatible = "mmc-card";
@@ -541,6 +556,23 @@
 		reset-gpios = <&tlmm 41 GPIO_ACTIVE_LOW>;
 		reset-assert-us = <40000>;
 		reset-deassert-us = <150000>;
+
+		leds {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			led@0 {
+				reg = <0>;
+				color = <LED_COLOR_ID_AMBER>;
+				function = LED_FUNCTION_WAN;
+			};
+
+			led@1 {
+				reg = <1>;
+				color = <LED_COLOR_ID_GREEN>;
+				function = LED_FUNCTION_WAN;
+			};
+		};
 	};
 
 	ethernet-phy-package@16 {
@@ -550,6 +582,12 @@
 		reg = <16>;
 
 		qcom,package-mode = "qsgmii";
+		/*
+		 * Match the 300 mV PQSGMII TX amplitude programmed by the
+		 * stock SSDK. The generic 600 mV default causes receive CRC
+		 * errors on the QSGMII channel connected to PPE port 3.
+		 */
+		qcom,tx-drive-strength-milliwatt = <300>;
 
 		qca8075_18: ethernet-phy@18 {
 			compatible = "ethernet-phy-ieee802.3-c22";
@@ -670,7 +708,7 @@
 
 	pcie@0 {
 		device_type = "pci";
-		reg = <0x0 0x0 0x1 0x0 0x0>;
+		reg = <0x0 0x0 0x0 0x0 0x0>;
 		#address-cells = <3>;
 		#size-cells = <2>;
 		ranges;
@@ -720,9 +758,9 @@
 	wake-gpios = <&tlmm 33 GPIO_ACTIVE_LOW>;
 	status = "okay";
 
-	pcie@0,0 {
+	pcie@0 {
 		device_type = "pci";
-		reg = <0x0 0x0 0x2 0x0 0x0>;
+		reg = <0x0 0x0 0x0 0x0 0x0>;
 		#address-cells = <3>;
 		#size-cells = <2>;
 		ranges;
