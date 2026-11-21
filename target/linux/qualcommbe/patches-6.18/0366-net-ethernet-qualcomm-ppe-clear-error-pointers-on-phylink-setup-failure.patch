@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jackie Han <jackie.han@gmail.com>
+Date: Sun, 11 Oct 2026 08:10:00 +0800
+Subject: [PATCH] net: ethernet: qualcomm: ppe: clear error pointers on phylink setup failure
+
+ppe_port_phylink_setup() assigns the result of ipq_pcs_get() and
+phylink_create() directly to ppe_port->pcs and ppe_port->phylink.  If
+either call fails, the ERR_PTR value is left in the structure.
+
+ppe_port_phylink_destroy() only checks these members for NULL, so any
+later call on the same port would hand the error pointer to
+ipq_pcs_put(), phylink_disconnect_phy() and phylink_destroy().
+
+Set both members to NULL when the calls fail.  The success path is
+unchanged.
+
+Signed-off-by: Jackie Han <jackie.han@gmail.com>
+
+--- a/drivers/net/ethernet/qualcomm/ppe/ppe_port.c
++++ b/drivers/net/ethernet/qualcomm/ppe/ppe_port.c
+@@ -1117,7 +1117,9 @@ int ppe_port_phylink_setup(struct ppe_port *ppe_port, struct net_device *netdev)
+ 	if (IS_ERR(ppe_port->pcs)) {
+ 		dev_err(ppe_dev->dev, "PPE port %d failed to create PCS\n",
+ 			ppe_port->port_id);
+-		return PTR_ERR(ppe_port->pcs);
++		ret = PTR_ERR(ppe_port->pcs);
++		ppe_port->pcs = NULL;
++		return ret;
+ 	}
+ 
+ 	/* Port phylink capability */
+@@ -1140,6 +1142,7 @@ int ppe_port_phylink_setup(struct ppe_port *ppe_port, struct net_device *netdev)
+ 		dev_err(ppe_dev->dev, "PPE port %d failed to create phylink\n",
+ 			ppe_port->port_id);
+ 		ret = PTR_ERR(ppe_port->phylink);
++		ppe_port->phylink = NULL;
+ 		goto err_free_pcs;
+ 	}
+ 
