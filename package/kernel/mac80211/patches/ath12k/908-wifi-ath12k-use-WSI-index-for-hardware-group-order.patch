@@ -1,0 +1,14 @@
+--- a/drivers/net/wireless/ath/ath12k/core.c
++++ b/drivers/net/wireless/ath/ath12k/core.c
+@@ -2077,8 +2077,9 @@ exit:
+ 
+ 	ath12k_dp_cmn_hw_group_assign(ath12k_ab_to_dp(ab), ag);
+ 
+-	ath12k_dbg(ab, ATH12K_DBG_BOOT, "wsi group-id %d num-devices %d index %d",
+-		   ag->id, ag->num_devices, wsi->index);
++	ath12k_dbg(ab, ATH12K_DBG_BOOT,
++		   "wsi group-id %d num-devices %d index %d device-id %d\n",
++		   ag->id, ag->num_devices, wsi->index, ab->device_id);
+ 
+ 	return ag;
+ }

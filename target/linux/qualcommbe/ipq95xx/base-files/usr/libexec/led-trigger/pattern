@@ -1,0 +1,15 @@
+# Sourced by /etc/init.d/led (load_led) for "option trigger 'pattern'".
+# The stock script has no pattern case, so drive the sysfs files here.
+#   option pattern '<brightness> <ms> [<brightness> <ms> ...]'
+config_get pattern "$1" pattern
+echo pattern > "/sys/class/leds/${sysfs}/trigger"
+echo "$pattern" > "/sys/class/leds/${sysfs}/pattern"
+
+# The init script starts the LEDs one after another, so a light made of several RGB
+# channels (white breathing) would start out of step and show colour fringes at the ends
+# of every fade. Line the channels up once they are all configured.
+case "$sysfs" in
+red:status|green:status|blue:status)
+	/usr/libexec/led-pattern-sync >/dev/null 2>&1 &
+	;;
+esac
